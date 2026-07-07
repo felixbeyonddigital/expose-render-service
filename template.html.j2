@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+/* ---------- Fonts (Montserrat, eingebettet) ---------- */
+@font-face { font-family:'Montserrat'; font-weight:300; src:url('assets/fonts/montserrat-latin-300-normal.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:400; src:url('assets/fonts/montserrat-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:500; src:url('assets/fonts/montserrat-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:600; src:url('assets/fonts/montserrat-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family:'Montserrat'; font-weight:700; src:url('assets/fonts/montserrat-latin-700-normal.woff2') format('woff2'); }
+/* latin-ext für Umlaute/ß sicher abgedeckt */
+@font-face { font-family:'Montserrat'; font-weight:300; src:url('assets/fonts/montserrat-latin-ext-300-normal.woff2') format('woff2'); unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB; }
+@font-face { font-family:'Montserrat'; font-weight:400; src:url('assets/fonts/montserrat-latin-ext-400-normal.woff2') format('woff2'); unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB; }
+@font-face { font-family:'Montserrat'; font-weight:700; src:url('assets/fonts/montserrat-latin-ext-700-normal.woff2') format('woff2'); unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB; }
+
+:root{
+  --green:#10231A;
+  --green-logo:#10231A;
+  --gold:#937C4E;
+  --text:#000000;
+  --muted:#333333;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+@page { size:A4; margin:0; }
+html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphens:auto; }
+
+.page{ position:relative; width:210mm; height:297mm; overflow:hidden; page-break-after:always; }
+.page:last-child{ page-break-after:auto; }
+
+/* ---------- Fußzeile ---------- */
+.footer{
+  position:absolute; left:0; right:0; bottom:9mm;
+  text-align:center; font-weight:300; font-size:6.5pt; color:var(--muted);
+  letter-spacing:.2px;
+}
+.footer-logo{
+  position:absolute; left:0; right:0; bottom:16mm;
+  text-align:center;
+}
+.footer-logo img{ height:15mm; }
+
+/* ---------- Seite 1: Deckblatt (Maße exakt aus Original-MAIL) ---------- */
+.cover{ background:var(--green); }
+.cover .accent{
+  position:absolute; left:50%; margin-left:-1.25mm;
+  width:2.5mm; height:4.2mm; background:var(--gold);
+}
+.cover .accent1{ top:31mm; }
+.cover .accent2{ top:65mm; }
+.cover .title{
+  position:absolute; left:0; right:0; top:41mm;
+  color:#ffffff; text-align:center; font-weight:400; font-size:20pt;
+  line-height:1.32;
+}
+.cover .hero{
+  position:absolute; left:30mm; right:30mm; top:114mm;
+  height:100mm; border:5px solid #ffffff;
+}
+.cover .hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+.cover .cover-logo{
+  position:absolute; left:0; right:0; top:243mm; text-align:center;
+}
+.cover .cover-logo img{ height:21mm; }
+
+/* ---------- Seite 2: Eckdaten-Tabelle ---------- */
+.data-wrap{ padding:42mm 22mm 0 22mm; }
+table.eck{ width:100%; border-collapse:collapse; }
+table.eck td{
+  font-size:11pt; font-weight:300; padding:7px 0; vertical-align:top;
+  border-bottom:1px solid #d9d9d9;
+}
+table.eck td.label{ width:42%; font-weight:400; color:#1a1a1a; white-space:pre-line; }
+table.eck td.value{ text-align:right; white-space:pre-line; }
+table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
+.objnr{
+  position:absolute; right:22mm; bottom:52mm;
+  font-size:11pt; color:var(--green-logo);
+}
+.objnr .bar{ display:inline-block; width:6px; height:13px; background:var(--green-logo); vertical-align:-1px; margin-right:8px; }
+.objnr b{ font-weight:700; }
+.objnr .lbl{ font-weight:400; letter-spacing:.5px; }
+
+/* ---------- Seite 3: Beschreibung ---------- */
+.desc{ padding:30mm 22mm 0 22mm; }
+.desc p{ font-size:11pt; font-weight:300; line-height:1.55; text-align:justify; margin-bottom:9pt; }
+.desc p strong{ font-weight:400; }  /* Hervorhebung = Regular (nicht fett), wie Original */
+
+/* ---------- Fotoseiten ---------- */
+.photos{ padding:14mm 14mm 0 14mm; }
+.photo-row{ width:100%; height:88mm; margin-bottom:5mm; }
+.photo-row.pair{ display:flex; gap:4mm; }
+.photo-row.pair .cell{ flex:1; height:100%; }
+.photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* ---------- Grundriss ---------- */
+.plan-wrap{ padding:26mm 18mm 0 18mm; text-align:center; }
+.plan-wrap img{ max-width:100%; max-height:190mm; object-fit:contain; }
+.plan-caption{ position:absolute; right:20mm; bottom:70mm; font-size:15pt; font-weight:300; color:#555; }
+
+/* ---------- Seite 8: Disclaimer ---------- */
+.bleed{ position:relative; width:100%; height:118mm; }
+.bleed img{ width:100%; height:100%; object-fit:cover; display:block; }
+.bleed .stripe{ position:absolute; left:0; right:0; bottom:0; height:6mm; background:var(--green); }
+.legal{ padding:16mm 22mm 0 22mm; }
+.legal h3{ font-size:11pt; font-weight:700; margin-bottom:10pt; }
+.legal p{ font-size:11pt; font-weight:300; line-height:1.5; text-align:justify; margin-bottom:9pt; }
+</style>
+</head>
+<body>
+
+<!-- ===== Seite 1: Deckblatt ===== -->
+<div class="page cover">
+  <div class="accent accent1"></div>
+  <div class="title">{{ titel_zeile1 }}<br>{{ titel_zeile2 }}</div>
+  <div class="accent accent2"></div>
+  <div class="hero"><img src="{{ titelbild }}"></div>
+  <div class="cover-logo"><img src="assets/logos/logo-white.svg"></div>
+</div>
+
+<!-- ===== Seite 2: Eckdaten ===== -->
+<div class="page">
+  <div class="data-wrap">
+    <table class="eck">
+      {% for row in eckdaten %}
+        {% if row.spacer %}<tr class="spacer"><td colspan="2"></td></tr>
+        {% else %}<tr><td class="label">{{ row.label }}</td><td class="value">{{ row.value }}</td></tr>{% endif %}
+      {% endfor %}
+    </table>
+  </div>
+  <div class="objnr"><span class="bar"></span><span class="lbl">OBJEKTNUMMER</span> <b>{{ objektnummer }}</b></div>
+  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer">{{ footer }}</div>
+</div>
+
+<!-- ===== Seite 3: Beschreibung ===== -->
+<div class="page">
+  <div class="desc">
+    {% for absatz in beschreibung %}<p>{{ absatz|safe }}</p>{% endfor %}
+  </div>
+  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer">{{ footer }}</div>
+</div>
+
+<!-- ===== Fotoseiten ===== -->
+{% for seite in fotoseiten %}
+<div class="page">
+  <div class="photos">
+    {% for row in seite %}
+      {% if row|length == 2 %}
+      <div class="photo-row pair">
+        <div class="cell"><img src="{{ row[0] }}"></div>
+        <div class="cell"><img src="{{ row[1] }}"></div>
+      </div>
+      {% else %}
+      <div class="photo-row"><img src="{{ row[0] }}"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer">{{ footer }}</div>
+</div>
+{% endfor %}
+
+<!-- ===== Grundriss ===== -->
+{% if grundriss %}
+<div class="page">
+  <div class="plan-wrap"><img src="{{ grundriss }}"></div>
+  <div class="plan-caption">Grundriss</div>
+  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer">{{ footer }}</div>
+</div>
+{% endif %}
+
+<!-- ===== Seite 8: Disclaimer ===== -->
+<div class="page">
+  {% if disclaimer_bild %}
+  <div class="bleed"><img src="{{ disclaimer_bild }}"><div class="stripe"></div></div>
+  {% endif %}
+  <div class="legal">
+    <h3>Nebenkosten des Mieters:</h3>
+    {% for absatz in rechtstext %}<p>{{ absatz }}</p>{% endfor %}
+  </div>
+  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer">{{ footer }}</div>
+</div>
+
+</body>
+</html>
