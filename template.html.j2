@@ -88,9 +88,11 @@ table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
 
 /* ---------- Fotoseiten ---------- */
 .photos{ padding:14mm 14mm 0 14mm; }
-.photo-row{ width:100%; height:88mm; margin-bottom:5mm; }
-.photo-row.pair{ display:flex; gap:4mm; }
-.photo-row.pair .cell{ flex:1; height:100%; }
+.photo-row{ width:100%; height:86mm; margin-bottom:6mm; }
+.photo-row:last-child{ margin-bottom:0; }
+.photo-row.pair{ display:flex; }
+.photo-row.pair .cell{ flex:1 1 0; height:100%; }
+.photo-row.pair .cell:first-child{ margin-right:6mm; }
 .photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
 
 /* ---------- Grundriss ---------- */
@@ -104,7 +106,7 @@ table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
 .bleed .stripe{ position:absolute; left:0; right:0; bottom:0; height:6mm; background:var(--green); }
 .legal{ padding:16mm 22mm 0 22mm; }
 .legal h3{ font-size:11pt; font-weight:700; margin-bottom:10pt; }
-.legal p{ font-size:11pt; font-weight:300; line-height:1.5; text-align:justify; margin-bottom:9pt; }
+.legal p{ font-size:11pt; font-weight:300; line-height:1.5; text-align:justify; margin-bottom:9pt; white-space:pre-line; }
 </style>
 </head>
 <body>
@@ -178,7 +180,7 @@ table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
   <div class="bleed"><img src="{{ disclaimer_bild }}"><div class="stripe"></div></div>
   {% endif %}
   <div class="legal">
-    <h3>Nebenkosten des Mieters:</h3>
+    {% if rechtstext_heading %}<h3>{{ rechtstext_heading }}</h3>{% endif %}
     {% for absatz in rechtstext %}<p>{{ absatz }}</p>{% endfor %}
   </div>
   <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>

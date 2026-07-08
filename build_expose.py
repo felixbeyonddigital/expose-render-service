@@ -34,6 +34,30 @@ RECHTSTEXT_MIETE = [
     "gilt österreichisches Recht als vereinbart. Gerichtstand 5020 Salzburg.",
 ]
 
+RECHTSTEXT_KAUF = [
+    "Dieses Angebot ist unverbindlich, freibleibend und nur für Sie als Selbstinteressenten "
+    "bestimmt. Weitergabe bewirkt Provisionshaftung. Zwischenverwertung vorbehalten.",
+    "Dieses Exposé ist eine Vorinformation. Alle Angaben stammen vom Verkäufer, konnten "
+    "von uns teilweise nicht geprüft werden und sind daher ohne Gewähr.",
+    "Ankaufspesen: 3,5 % Grunderwerbssteuer, 1,1 % Grundbucheintragungskosten, "
+    "Vertragserrichtungskosten, 3 % Maklerhonorar zuzüglich Umsatzsteuer, Spesen.",
+    "Der guten Ordnung halber halten wir fest, dass wir als Doppelmakler tätig sind.",
+    "Für dieses und zukünftige Rechtsgeschäfte gilt österreichisches Recht als vereinbart. "
+    "Gerichtstand 5020 Salzburg.",
+]
+
+
+def rechtstext_for(data):
+    """(Absätze, Überschrift) je nach Geschäftsart. Eigener rechtstext im daten.json hat Vorrang."""
+    art = str(data.get("geschaeftsart") or "miete").lower()
+    if art == "kauf":
+        default_rt, heading = RECHTSTEXT_KAUF, ""
+    else:
+        default_rt, heading = RECHTSTEXT_MIETE, "Nebenkosten des Mieters:"
+    rechtstext = data.get("rechtstext") or default_rt
+    heading = data.get("rechtstext_heading", heading)
+    return rechtstext, heading
+
 
 def slug(s):
     return re.sub(r"[^A-Za-z0-9]+", "-", s).strip("-")
@@ -158,8 +182,10 @@ def build(folder: Path):
         "fotoseiten": group_photos(photos),
         "grundriss": grundriss,
         "disclaimer_bild": disclaimer_bild,
-        "rechtstext": data.get("rechtstext", RECHTSTEXT_MIETE),
+        "rechtstext": None,          # unten gesetzt
+        "rechtstext_heading": None,  # unten gesetzt
     }
+    ctx["rechtstext"], ctx["rechtstext_heading"] = rechtstext_for(data)
 
     # Assets in Work-Ordner spiegeln (relative url() in CSS)
     shutil.copytree(GEN_DIR / "assets", work / "assets")
