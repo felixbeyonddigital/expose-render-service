@@ -124,12 +124,18 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 
 /* ---------- Fotoseiten ---------- */
 .photos{ padding:14mm 14mm 0 14mm; }
-.photo-row{ width:100%; height:86mm; margin-bottom:6mm; }
+.photo-row{ width:100%; height:88mm; margin-bottom:6mm; }
 .photo-row:last-child{ margin-bottom:0; }
 .photo-row.pair{ display:flex; }
 .photo-row.pair .cell{ flex:1 1 0; height:100%; }
 .photo-row.pair .cell:first-child{ margin-right:6mm; }
 .photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
+/* Höhe je Format: quadratisch (Standard), hochformat, querformat + Einzelbilder */
+.photo-row.row-square{ height:88mm; }
+.photo-row.row-portrait{ height:117mm; }
+.photo-row.row-landscape{ height:100mm; }
+.photo-row.row-square_single{ height:120mm; }
+.photo-row.row-portrait_single{ height:150mm; }
 
 /* ---------- Grundriss ---------- */
 .plan-wrap{ padding:26mm 18mm 0 18mm; text-align:center; }
@@ -190,13 +196,13 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 <div class="page">
   <div class="photos">
     {% for row in seite %}
-      {% if row|length == 2 %}
-      <div class="photo-row pair">
-        <div class="cell"><img src="{{ row[0] }}"></div>
-        <div class="cell"><img src="{{ row[1] }}"></div>
+      {% if row.cells|length == 2 %}
+      <div class="photo-row pair row-{{ row.type }}">
+        <div class="cell"><img src="{{ row.cells[0] }}"></div>
+        <div class="cell"><img src="{{ row.cells[1] }}"></div>
       </div>
       {% else %}
-      <div class="photo-row"><img src="{{ row[0] }}"></div>
+      <div class="photo-row row-{{ row.type }}"><img src="{{ row.cells[0] }}"></div>
       {% endif %}
     {% endfor %}
   </div>

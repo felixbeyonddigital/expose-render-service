@@ -96,20 +96,52 @@ def source_photos(folder: Path):
     return [f for f in files if f.stem not in edited_stems]
 
 
+ROW_HEIGHT_MM = {
+    "square": 88, "portrait": 117, "landscape": 100,
+    "square_single": 120, "portrait_single": 150,
+}
+
+
 def group_photos(photos):
-    """Fotos in Seiten à 2 Bildern (paarweise, quer) gruppieren."""
-    pages = []
-    row = []
+    """Fotos nach Format gruppieren.
+    photos: Liste (pfad, format) mit format in {square, portrait, landscape}.
+    - quadratisch/hochformat: 2 pro Reihe (paarweise)
+    - querformat: 1 pro Reihe (volle Breite)
+    Rückgabe: Seiten (Liste) aus Reihen-Dicts {type, cells:[pfad,...]}.
+    """
     rows = []
-    for p in photos:
-        row.append(p)
-        if len(row) == 2:
-            rows.append(row); row = []
-    if row:
-        rows.append(row)  # letztes einzelnes Bild ganze Breite
-    # 2 Reihen pro Seite
-    for i in range(0, len(rows), 2):
-        pages.append(rows[i:i+2])
+    buf = []
+
+    def flush():
+        while buf:
+            pair = buf[:2]
+            del buf[:2]
+            if len(pair) == 2:
+                fmt = "portrait" if any(f == "portrait" for _, f in pair) else "square"
+                rows.append({"type": fmt, "cells": [p for p, _ in pair]})
+            else:
+                p, f = pair[0]
+                rows.append({"type": "portrait_single" if f == "portrait" else "square_single", "cells": [p]})
+
+    for p, f in photos:
+        if f == "landscape":
+            flush()
+            rows.append({"type": "landscape", "cells": [p]})
+        else:
+            buf.append((p, f))
+            if len(buf) == 2:
+                flush()
+    flush()
+
+    # Seiten nach Höhenbudget füllen (statt fix 2 Reihen), damit hohe Formate nicht überlaufen.
+    pages, cur, used, budget = [], [], 0, 250
+    for r in rows:
+        h = ROW_HEIGHT_MM.get(r["type"], 88) + 6
+        if cur and used + h > budget:
+            pages.append(cur); cur = []; used = 0
+        cur.append(r); used += h
+    if cur:
+        pages.append(cur)
     return pages
 
 
@@ -165,9 +197,15 @@ def build(folder: Path):
     disclaimer_bild = None
     if disc_file:
         prep_image(disc_file, fdir / "bleed.jpg", max_px=2400); disclaimer_bild = "fotos/bleed.jpg"
+    formats = data.get("foto_formats") or []
+    valid_fmt = {"square", "portrait", "landscape"}
     photos = []
     for i, f in enumerate(gallery_src):
-        prep_image(f, fdir / f"foto_{i:02d}.jpg"); photos.append(f"fotos/foto_{i:02d}.jpg")
+        prep_image(f, fdir / f"foto_{i:02d}.jpg")
+        fmt = formats[i] if i < len(formats) else "square"
+        if fmt not in valid_fmt:
+            fmt = "square"
+        photos.append((f"fotos/foto_{i:02d}.jpg", fmt))
 
     grundriss = find_grundriss(folder, fdir)
 
