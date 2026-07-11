@@ -209,8 +209,12 @@ def build(folder: Path):
 
     grundriss = find_grundriss(folder, fdir)
 
+    logo_svg = (GEN_DIR / "assets" / "logos" / "logo.svg").read_text(encoding="utf-8")
+
     ctx = {
         "footer": FOOTER,
+        "gewerbe": bool(data.get("gewerbe")),
+        "logo_svg": logo_svg,
         "titel_zeile1": data["titel_zeile1"],
         "titel_zeile2": data["titel_zeile2"],
         "objektnummer": data["objektnummer"],

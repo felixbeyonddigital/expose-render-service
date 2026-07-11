@@ -15,8 +15,9 @@
 @font-face { font-family:'Montserrat'; font-weight:700; src:url('assets/fonts/montserrat-latin-ext-700-normal.woff2') format('woff2'); unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB; }
 
 :root{
-  --green:#10231A;
-  --green-logo:#10231A;
+  /* Standard: Kanzleigrün. Gewerbe-Objekt: Blau (PANTONE 533 C = #202945). */
+  --green:{{ '#202945' if gewerbe else '#10231A' }};
+  --green-logo:{{ '#202945' if gewerbe else '#10231A' }};
   --gold:#937C4E;
   --stone:#d1cdbc;   /* PANTONE 7534 C „Naturstein grau" (CMYK 0 2 10 18) – Tabellen-/Trennlinien */
   --text:#000000;
@@ -37,9 +38,9 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 }
 .footer-logo{
   position:absolute; left:0; right:0; bottom:16mm;
-  text-align:center;
+  text-align:center; color:var(--green);          /* Logo per currentColor eingefärbt */
 }
-.footer-logo img{ height:15mm; }
+.footer-logo svg{ height:15mm; width:auto; display:inline-block; }
 
 /* ---------- Seite 1: Deckblatt (Maße exakt aus Original-MAIL) ---------- */
 .cover{ background:var(--green); }
@@ -65,8 +66,8 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .cover.cover-druck .druck-objnr .bar{ display:inline-block; width:1.6mm; height:3.4mm; background:var(--green); vertical-align:-0.3mm; margin-right:3mm; }
 .cover.cover-druck .druck-objnr .lbl{ font-weight:400; }
 .cover.cover-druck .druck-objnr b{ font-weight:700; }
-.cover.cover-druck .cover-logo{ top:266mm; }
-.cover.cover-druck .cover-logo img{ height:14mm; }
+.cover.cover-druck .cover-logo{ top:266mm; color:var(--green); }   /* DRUCK: dunkles/blaues Logo auf Weiß */
+.cover.cover-druck .cover-logo svg{ height:14mm; }
 /* Titelblock zentriert, max. 70% Breite, Umbruch automatisch.
    Der untere Gold-Balken (accent) folgt dem Titel dynamisch – egal ob 1–4 Zeilen. */
 .cover .titleblock{
@@ -88,8 +89,9 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .cover .hero img{ width:100%; height:100%; object-fit:cover; display:block; }
 .cover .cover-logo{
   position:absolute; left:0; right:0; top:243mm; text-align:center;
+  color:#ffffff;                                   /* MAIL: weißes Logo auf farbigem Deckblatt */
 }
-.cover .cover-logo img{ height:21mm; }
+.cover .cover-logo svg{ height:21mm; width:auto; display:inline-block; }
 
 /* ---------- Seite 2: Eckdaten-Tabelle ---------- */
 /* Eckdaten-Tabelle exakt aus IDML: Satzbreite 170 mm, Spalte 1 = 60 mm (dann Umbruch),
@@ -163,7 +165,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     <div class="accent"></div>
   </div>
   {% if druck %}<div class="druck-objnr"><span class="bar"></span><span class="lbl">Objektnummer</span> <b>{{ objektnummer }}</b></div>{% endif %}
-  <div class="cover-logo"><img src="assets/logos/logo-{{ 'green' if druck else 'white' }}.svg"></div>
+  <div class="cover-logo">{{ logo_svg|safe }}</div>
   {% if druck %}<div class="footer">{{ footer }}</div>{% endif %}
 </div>
 
@@ -178,7 +180,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     </div>
   </div>
   <div class="objnr"><span class="bar"></span><span class="lbl">OBJEKTNUMMER</span> <b>{{ objektnummer }}</b></div>
-  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer-logo">{{ logo_svg|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
@@ -187,7 +189,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   <div class="desc">
     {% for absatz in beschreibung %}<p>{{ absatz|safe }}</p>{% endfor %}
   </div>
-  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer-logo">{{ logo_svg|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
@@ -206,7 +208,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
       {% endif %}
     {% endfor %}
   </div>
-  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer-logo">{{ logo_svg|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 {% endfor %}
@@ -216,7 +218,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 <div class="page">
   <div class="plan-wrap"><img src="{{ grundriss }}"></div>
   <div class="plan-caption">Grundriss</div>
-  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer-logo">{{ logo_svg|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 {% endif %}
@@ -230,7 +232,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     {% if rechtstext_heading %}<h3>{{ rechtstext_heading }}</h3>{% endif %}
     {% for absatz in rechtstext %}<p>{{ absatz }}</p>{% endfor %}
   </div>
-  <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
+  <div class="footer-logo">{{ logo_svg|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
