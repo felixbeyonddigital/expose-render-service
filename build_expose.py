@@ -209,7 +209,8 @@ def build(folder: Path):
 
     grundriss = find_grundriss(folder, fdir)
 
-    logo_svg = (GEN_DIR / "assets" / "logos" / "logo.svg").read_text(encoding="utf-8")
+    # Logo: eigenes Logo aus den Daten (vom Plugin, currentColor-normalisiert) oder Standard-Logo.
+    logo_svg = data.get("logo_svg") or (GEN_DIR / "assets" / "logos" / "logo.svg").read_text(encoding="utf-8")
 
     ctx = {
         "footer": FOOTER,
