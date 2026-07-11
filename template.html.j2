@@ -165,7 +165,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     <div class="accent"></div>
   </div>
   {% if druck %}<div class="druck-objnr"><span class="bar"></span><span class="lbl">Objektnummer</span> <b>{{ objektnummer }}</b></div>{% endif %}
-  <div class="cover-logo">{{ logo_svg|safe }}</div>
+  <div class="cover-logo">{{ (logo_dark if druck else logo_white)|safe }}</div>
   {% if druck %}<div class="footer">{{ footer }}</div>{% endif %}
 </div>
 
@@ -180,7 +180,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     </div>
   </div>
   <div class="objnr"><span class="bar"></span><span class="lbl">OBJEKTNUMMER</span> <b>{{ objektnummer }}</b></div>
-  <div class="footer-logo">{{ logo_svg|safe }}</div>
+  <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
@@ -189,7 +189,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   <div class="desc">
     {% for absatz in beschreibung %}<p>{{ absatz|safe }}</p>{% endfor %}
   </div>
-  <div class="footer-logo">{{ logo_svg|safe }}</div>
+  <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
@@ -208,7 +208,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
       {% endif %}
     {% endfor %}
   </div>
-  <div class="footer-logo">{{ logo_svg|safe }}</div>
+  <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 {% endfor %}
@@ -218,7 +218,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 <div class="page">
   <div class="plan-wrap"><img src="{{ grundriss }}"></div>
   <div class="plan-caption">Grundriss</div>
-  <div class="footer-logo">{{ logo_svg|safe }}</div>
+  <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 {% endif %}
@@ -232,7 +232,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     {% if rechtstext_heading %}<h3>{{ rechtstext_heading }}</h3>{% endif %}
     {% for absatz in rechtstext %}<p>{{ absatz }}</p>{% endfor %}
   </div>
-  <div class="footer-logo">{{ logo_svg|safe }}</div>
+  <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 

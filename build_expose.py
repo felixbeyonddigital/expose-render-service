@@ -210,12 +210,18 @@ def build(folder: Path):
     grundriss = find_grundriss(folder, fdir)
 
     # Logo: eigenes Logo aus den Daten (vom Plugin, currentColor-normalisiert) oder Standard-Logo.
+    # Farbe direkt ins SVG einbacken (robust, unabhängig von currentColor-Unterstützung).
     logo_svg = data.get("logo_svg") or (GEN_DIR / "assets" / "logos" / "logo.svg").read_text(encoding="utf-8")
+    _theme_color = "#202945" if bool(data.get("gewerbe")) else "#10231A"
+    logo_white = logo_svg.replace("currentColor", "#ffffff")
+    logo_dark = logo_svg.replace("currentColor", _theme_color)
 
     ctx = {
         "footer": FOOTER,
         "gewerbe": bool(data.get("gewerbe")),
         "logo_svg": logo_svg,
+        "logo_white": logo_white,
+        "logo_dark": logo_dark,
         "titel_zeile1": data["titel_zeile1"],
         "titel_zeile2": data["titel_zeile2"],
         "objektnummer": data["objektnummer"],
