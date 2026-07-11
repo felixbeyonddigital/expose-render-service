@@ -191,21 +191,27 @@ def build(folder: Path):
     shutil.copytree(GEN_DIR / "assets", work / "assets")
 
     env = Environment(loader=FileSystemLoader(str(GEN_DIR)))
-    html = env.get_template("template.html.j2").render(**ctx)
-    (work / "expose.html").write_text(html, encoding="utf-8")
-
+    tpl = env.get_template("template.html.j2")
     from weasyprint import HTML
     out_base = f"{data['objektnummer']}_{slug(data['titel_zeile1'])}"
-    druck = folder / f"{out_base}_DRUCK.pdf"
-    HTML(str(work / "expose.html"), base_url=str(work)).write_pdf(str(druck))
 
-    # MAIL-Version: mit Ghostscript komprimieren
+    # DRUCK: weißes Deckblatt (spart Druckfarbe), hochauflösend, unkomprimiert
+    html_druck = tpl.render(druck=True, **ctx)
+    (work / "druck.html").write_text(html_druck, encoding="utf-8")
+    druck = folder / f"{out_base}_DRUCK.pdf"
+    HTML(str(work / "druck.html"), base_url=str(work)).write_pdf(str(druck))
+
+    # MAIL: grünes Deckblatt (Bildschirm/Versand), danach mit Ghostscript komprimieren
+    html_mail = tpl.render(druck=False, **ctx)
+    (work / "mail.html").write_text(html_mail, encoding="utf-8")
+    mail_full = work / "mail_full.pdf"
+    HTML(str(work / "mail.html"), base_url=str(work)).write_pdf(str(mail_full))
     mail = folder / f"{out_base}_MAIL.pdf"
     subprocess.run([
         "gs", "-sDEVICE=pdfwrite", "-dCompatibilityLevel=1.5",
         "-dPDFSETTINGS=/ebook", "-dNOPAUSE", "-dQUIET", "-dBATCH",
         "-dColorImageResolution=120", "-dGrayImageResolution=120",
-        f"-sOutputFile={mail}", str(druck)
+        f"-sOutputFile={mail}", str(mail_full)
     ], check=True)
 
     shutil.rmtree(work, ignore_errors=True)

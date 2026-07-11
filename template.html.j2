@@ -18,6 +18,7 @@
   --green:#10231A;
   --green-logo:#10231A;
   --gold:#937C4E;
+  --stone:#d1cdbc;   /* PANTONE 7534 C „Naturstein grau" (CMYK 0 2 10 18) – Tabellen-/Trennlinien */
   --text:#000000;
   --muted:#333333;
 }
@@ -42,16 +43,43 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 
 /* ---------- Seite 1: Deckblatt (Maße exakt aus Original-MAIL) ---------- */
 .cover{ background:var(--green); }
-.cover .accent{
-  position:absolute; left:50%; margin-left:-1.25mm;
-  width:2.5mm; height:4.2mm; background:var(--gold);
+/* DRUCK-Variante (exakt aus InDesign/IDML, Seite 2): weißes Deckblatt (spart
+   Druckfarbe). Bild randabfallend oben bis 120 mm, dünner grüner Balken darunter,
+   dunkler Titel, KEINE Gold-Balken, Objektnummer mit Linie oben/unten, dunkles Logo, Fußzeile. */
+.cover.cover-druck{ background:#ffffff; }
+.cover.cover-druck .hero{
+  left:0; right:0; top:0; height:120mm; border:none;
 }
-.cover .accent1{ top:31mm; }
-.cover .accent2{ top:65mm; }
+.cover.cover-druck .druck-stripe{
+  position:absolute; left:0; right:0; top:120mm; height:2.5mm; background:var(--green);
+}
+.cover.cover-druck .accent{ display:none; }            /* im DRUCK keine Gold-Balken */
+.cover.cover-druck .titleblock{ top:128mm; }
+.cover.cover-druck .title{ color:var(--green); font-size:27pt; }   /* Zeichenstil „A4 V:Überschrift" = 27pt */
+/* Objektnummer: rechtsbündig, grün, Gold-/Grün-Balken links, Linien oben+unten (0,5pt Naturstein grau) über die Satzbreite. Logo DARUNTER. */
+.cover.cover-druck .druck-objnr{
+  position:absolute; left:20mm; right:20mm; top:250mm;
+  text-align:right; color:var(--green); font-weight:300; font-size:11pt; letter-spacing:.3px;
+  padding:3mm 0; border-top:0.5pt solid var(--stone); border-bottom:0.5pt solid var(--stone);
+}
+.cover.cover-druck .druck-objnr .bar{ display:inline-block; width:1.6mm; height:3.4mm; background:var(--green); vertical-align:-0.3mm; margin-right:3mm; }
+.cover.cover-druck .druck-objnr .lbl{ font-weight:400; }
+.cover.cover-druck .druck-objnr b{ font-weight:700; }
+.cover.cover-druck .cover-logo{ top:266mm; }
+.cover.cover-druck .cover-logo img{ height:14mm; }
+/* Titelblock zentriert, max. 70% Breite, Umbruch automatisch.
+   Der untere Gold-Balken (accent) folgt dem Titel dynamisch – egal ob 1–4 Zeilen. */
+.cover .titleblock{
+  position:absolute; left:15%; right:15%; top:31mm;
+  text-align:center;
+}
+.cover .accent{
+  width:2.5mm; height:4.2mm; background:var(--gold); margin:0 auto;
+}
 .cover .title{
-  position:absolute; left:0; right:0; top:41mm;
-  color:#ffffff; text-align:center; font-weight:400; font-size:20pt;
-  line-height:1.32;
+  color:#ffffff; font-weight:400; font-size:20pt; line-height:1.32;
+  margin:6mm 0; word-wrap:break-word; overflow-wrap:break-word;
+  -weasy-hyphens:none; hyphens:none;  /* ganze Wörter umbrechen, keine „Aus-blick"-Trennung */
 }
 .cover .hero{
   position:absolute; left:30mm; right:30mm; top:114mm;
@@ -64,15 +92,23 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .cover .cover-logo img{ height:21mm; }
 
 /* ---------- Seite 2: Eckdaten-Tabelle ---------- */
-.data-wrap{ padding:42mm 22mm 0 22mm; }
-table.eck{ width:100%; border-collapse:collapse; }
-table.eck td{
-  font-size:11pt; font-weight:300; padding:7px 0; vertical-align:top;
-  border-bottom:1px solid #d9d9d9;
+/* Eckdaten-Tabelle exakt aus IDML: Satzbreite 170 mm, Spalte 1 = 60 mm (dann Umbruch),
+   Spalte 2 = 110 mm. Durchgehende 0,5-pt-Linien in Naturstein grau – als Flex-Zeilen,
+   damit die Linie lückenlos über beide Spalten läuft (keine Zell-Naht) und leere
+   Zeilen die Linien behalten. */
+.data-wrap{ padding:42mm 20mm 0 20mm; }
+.eck{ border-top:0.5pt solid var(--stone); }
+.eck-row{
+  display:flex; align-items:stretch;
+  font-size:11pt; font-weight:300; line-height:1.35;
+  border-bottom:0.5pt solid var(--stone);
 }
-table.eck td.label{ width:42%; font-weight:400; color:#1a1a1a; white-space:pre-line; }
-table.eck td.value{ text-align:right; white-space:pre-line; }
-table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
+/* Bezeichnungsspalte 60 mm + durchgehende vertikale 0,5-pt-Linie (Naturstein grau) rechts. */
+.eck-label{
+  flex:0 0 60mm; width:60mm; font-weight:400; color:#1a1a1a;
+  padding:7px 6mm 7px 0; border-right:0.5pt solid var(--stone);
+}
+.eck-value{ flex:1 1 auto; text-align:right; white-space:pre-line; padding:7px 0 7px 6mm; }
 .objnr{
   position:absolute; right:22mm; bottom:52mm;
   font-size:11pt; color:var(--green-logo);
@@ -112,23 +148,28 @@ table.eck tr.spacer td{ border-bottom:none; height:14px; padding:0; }
 <body>
 
 <!-- ===== Seite 1: Deckblatt ===== -->
-<div class="page cover">
-  <div class="accent accent1"></div>
-  <div class="title">{{ titel_zeile1 }}<br>{{ titel_zeile2 }}</div>
-  <div class="accent accent2"></div>
+<div class="page cover{% if druck %} cover-druck{% endif %}">
   <div class="hero"><img src="{{ titelbild }}"></div>
-  <div class="cover-logo"><img src="assets/logos/logo-white.svg"></div>
+  {% if druck %}<div class="druck-stripe"></div>{% endif %}
+  <div class="titleblock">
+    <div class="accent"></div>
+    <div class="title">{{ titel_zeile1 }}{% if titel_zeile2 %}<br>{{ titel_zeile2 }}{% endif %}</div>
+    <div class="accent"></div>
+  </div>
+  {% if druck %}<div class="druck-objnr"><span class="bar"></span><span class="lbl">Objektnummer</span> <b>{{ objektnummer }}</b></div>{% endif %}
+  <div class="cover-logo"><img src="assets/logos/logo-{{ 'green' if druck else 'white' }}.svg"></div>
+  {% if druck %}<div class="footer">{{ footer }}</div>{% endif %}
 </div>
 
 <!-- ===== Seite 2: Eckdaten ===== -->
 <div class="page">
   <div class="data-wrap">
-    <table class="eck">
+    <div class="eck">
       {% for row in eckdaten %}
-        {% if row.spacer %}<tr class="spacer"><td colspan="2"></td></tr>
-        {% else %}<tr><td class="label">{{ row.label }}</td><td class="value">{{ row.value }}</td></tr>{% endif %}
+        {% if row.spacer %}<div class="eck-row"><div class="eck-label">&nbsp;</div><div class="eck-value"></div></div>
+        {% else %}<div class="eck-row"><div class="eck-label">{{ row.label }}</div><div class="eck-value">{{ row.value }}</div></div>{% endif %}
       {% endfor %}
-    </table>
+    </div>
   </div>
   <div class="objnr"><span class="bar"></span><span class="lbl">OBJEKTNUMMER</span> <b>{{ objektnummer }}</b></div>
   <div class="footer-logo"><img src="assets/logos/logo-green.svg"></div>
