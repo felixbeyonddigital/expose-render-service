@@ -80,29 +80,21 @@ def health():
 
 
 def _basic_enhance(raw: bytes) -> bytes:
-    """Kostenlose Bildverbesserung: Autokontrast, sanfter Weißabgleich, Farbe/Schärfe."""
+    """Kostenlose, dezente Bildverbesserung – farbtreu, ohne Farbstich.
+    Nur sanfter, tonwert-erhaltender Autokontrast + minimale Farbe/Schärfe."""
     from PIL import Image, ImageOps, ImageEnhance
     im = Image.open(io.BytesIO(raw))
     im = ImageOps.exif_transpose(im).convert("RGB")
-    im = ImageOps.autocontrast(im, cutoff=1)
-    # sanfter Grauwelt-Weißabgleich
+    # farbtreuer Autokontrast (verhindert Farbstich); Fallback für ältere Pillow-Versionen
     try:
-        r, g, b = im.split()
-        mr, mg, mb = [c.resize((1, 1)).getpixel((0, 0)) for c in (r, g, b)]
-        avg = (mr + mg + mb) / 3.0
-        if min(mr, mg, mb) > 4:  # keine extremen Korrekturen
-            r = r.point(lambda v: min(255, int(v * (avg / mr))))
-            g = g.point(lambda v: min(255, int(v * (avg / mg))))
-            b = b.point(lambda v: min(255, int(v * (avg / mb))))
-            im = Image.merge("RGB", (r, g, b))
-    except Exception:
-        pass
-    im = ImageEnhance.Color(im).enhance(1.08)
-    im = ImageEnhance.Contrast(im).enhance(1.05)
-    im = ImageEnhance.Brightness(im).enhance(1.02)
-    im = ImageEnhance.Sharpness(im).enhance(1.15)
+        im = ImageOps.autocontrast(im, cutoff=0.5, preserve_tone=True)
+    except TypeError:
+        im = ImageOps.autocontrast(im, cutoff=0.5)
+    im = ImageEnhance.Color(im).enhance(1.04)
+    im = ImageEnhance.Contrast(im).enhance(1.03)
+    im = ImageEnhance.Sharpness(im).enhance(1.10)
     out = io.BytesIO()
-    im.save(out, "JPEG", quality=90)
+    im.save(out, "JPEG", quality=92)
     return out.getvalue()
 
 
