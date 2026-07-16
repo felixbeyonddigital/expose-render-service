@@ -42,6 +42,7 @@ IMG_AI_PROVIDER = os.environ.get("IMG_AI_PROVIDER", "openai").lower()
 IMG_AI_KEY = os.environ.get("IMG_AI_KEY") or os.environ.get("OPENAI_API_KEY", "")
 IMG_AI_MODEL = os.environ.get("IMG_AI_MODEL", "gpt-image-1")
 IMG_AI_QUALITY = os.environ.get("IMG_AI_QUALITY", "low")
+IMG_AI_TEXT_MODEL = os.environ.get("IMG_AI_TEXT_MODEL", "gpt-4o-mini")
 
 _STAGE_PROMPTS = {
     "modern": (
@@ -105,11 +106,12 @@ def _basic_enhance(raw: bytes) -> bytes:
     return out.getvalue()
 
 
-def _ai_stage(raw: bytes, mode: str) -> bytes:
+def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
     """KI-Möblierung via OpenAI-kompatiblem Images-Edit-Endpoint."""
-    if IMG_AI_PROVIDER == "none" or not IMG_AI_KEY:
+    api_key = (key or IMG_AI_KEY or "").strip()
+    if IMG_AI_PROVIDER == "none" or not api_key:
         raise HTTPException(status_code=400,
-                            detail="KI-Möblierung ist nicht konfiguriert (IMG_AI_KEY fehlt).")
+                            detail="KI-Möblierung ist nicht konfiguriert (kein KI-Schlüssel hinterlegt).")
     import requests
     from PIL import Image, ImageOps
     im = Image.open(io.BytesIO(raw))
@@ -122,7 +124,7 @@ def _ai_stage(raw: bytes, mode: str) -> bytes:
     try:
         resp = requests.post(
             "https://api.openai.com/v1/images/edits",
-            headers={"Authorization": f"Bearer {IMG_AI_KEY}"},
+            headers={"Authorization": f"Bearer {api_key}"},
             data={"model": IMG_AI_MODEL, "prompt": _STAGE_PROMPTS[mode],
                   "size": size, "quality": IMG_AI_QUALITY, "n": "1"},
             files={"image": ("room.png", buf, "image/png")},
@@ -144,8 +146,10 @@ async def enhance(
     image: UploadFile = File(...),
     mode: str = Form("basic"),
     x_api_key: Optional[str] = Header(None),
+    x_img_ai_key: Optional[str] = Header(None),
 ):
-    """Ein Foto optimieren. mode: 'basic' (kostenlos), 'modern' oder 'classic' (KI)."""
+    """Ein Foto optimieren. mode: 'basic' (kostenlos), 'modern' oder 'classic' (KI).
+    Der KI-Schlüssel kann pro Anfrage via Header X-Img-Ai-Key kommen (sonst Env IMG_AI_KEY)."""
     _check_key(x_api_key)
     raw = await image.read()
     if not raw:
@@ -153,10 +157,77 @@ async def enhance(
     if mode == "basic":
         out, mime = _basic_enhance(raw), "image/jpeg"
     elif mode in ("modern", "classic"):
-        out, mime = _ai_stage(raw, mode), "image/png"
+        out, mime = _ai_stage(raw, mode, x_img_ai_key or ""), "image/png"
     else:
         raise HTTPException(status_code=400, detail=f"Unbekannter Modus: {mode}")
     return JSONResponse({"image_base64": base64.b64encode(out).decode(), "mime": mime})
+
+
+def _ai_rewrite(text: str, key: str = ""):
+    """Objektbeschreibung stilistisch verbessern – Inhalt bleibt gleich, nichts erfinden. 3 Varianten."""
+    api_key = (key or IMG_AI_KEY or "").strip()
+    if IMG_AI_PROVIDER == "none" or not api_key:
+        raise HTTPException(status_code=400, detail="KI-Textverbesserung ist nicht konfiguriert (kein KI-Schlüssel).")
+    import requests
+    import json as _json
+    sys_prompt = (
+        "Du bist ein erfahrener Immobilien-Lektor. Deine Aufgabe ist es, AUSSCHLIESSLICH Schreibstil, "
+        "Formulierung, Grammatik und Lesbarkeit des folgenden Objektbeschreibungs-Textes zu verbessern.\n"
+        "STRIKTE REGELN: Inhalt, Fakten, Zahlen, Maße, Ausstattung und Aussagen bleiben UNVERÄNDERT. "
+        "Nichts erfinden, keine neuen Eigenschaften/Ausstattung/Lagevorteile hinzufügen, nichts inhaltlich weglassen. "
+        "Keine Übertreibungen oder Behauptungen ergänzen. Sprache: Deutsch. Absatzstruktur sinnvoll beibehalten.\n"
+        "Gib GENAU 3 Varianten in unterschiedlicher Tonalität zurück: "
+        "1) sachlich & seriös, 2) hochwertig & einladend, 3) modern & kompakt.\n"
+        "Antworte NUR als JSON in der Form: "
+        "{\"varianten\": [{\"stil\": \"…\", \"text\": \"…\"}, …]}"
+    )
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": IMG_AI_TEXT_MODEL,
+                "temperature": 0.4,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": text},
+                ],
+            },
+            timeout=90,
+        )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"KI-Dienst nicht erreichbar: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"KI-Fehler ({r.status_code}): {r.text[:300]}")
+    try:
+        content = r.json()["choices"][0]["message"]["content"]
+        data = _json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=502, detail="KI-Antwort konnte nicht gelesen werden.")
+    raw_vars = data.get("varianten") or data.get("variants") or []
+    out = []
+    for i, v in enumerate(raw_vars):
+        t = str(v.get("text") or "").strip()
+        if t:
+            out.append({"stil": str(v.get("stil") or v.get("style") or f"Variante {i + 1}"), "text": t})
+    if not out:
+        raise HTTPException(status_code=502, detail="Keine Textvarianten erhalten.")
+    return out
+
+
+@app.post("/rewrite")
+async def rewrite(
+    text: str = Form(...),
+    x_api_key: Optional[str] = Header(None),
+    x_img_ai_key: Optional[str] = Header(None),
+):
+    """Objektbeschreibung stilistisch in 3 Varianten verbessern (Inhalt bleibt gleich)."""
+    _check_key(x_api_key)
+    t = (text or "").strip()
+    if not t:
+        raise HTTPException(status_code=400, detail="Kein Text übergeben.")
+    return JSONResponse({"variants": _ai_rewrite(t, x_img_ai_key or "")})
 
 
 @app.post("/generate")
