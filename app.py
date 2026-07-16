@@ -18,6 +18,9 @@ import json
 import base64
 import shutil
 import tempfile
+import threading
+import time
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
@@ -44,18 +47,21 @@ IMG_AI_MODEL = os.environ.get("IMG_AI_MODEL", "gpt-image-1")
 IMG_AI_QUALITY = os.environ.get("IMG_AI_QUALITY", "low")
 IMG_AI_TEXT_MODEL = os.environ.get("IMG_AI_TEXT_MODEL", "gpt-4o-mini")
 
+_STAGE_KEEP = (
+    "WICHTIG: Es ist exakt DERSELBE Raum wie im Originalfoto. Kameraperspektive, Blickwinkel, "
+    "Brennweite, Wände, Fenster, Türen, Decke, Bodenbelag und alle Raumproportionen bleiben "
+    "100 % identisch und unverändert. Verändere die Perspektive NICHT und bewege die Kamera NICHT. "
+    "Erfinde keine zusätzlichen Fenster/Türen. Ergänze ausschließlich passende Möbel und Dekoration, "
+    "fotorealistisch und maßstabsgetreu in den bestehenden Raum eingefügt. "
+)
 _STAGE_PROMPTS = {
     "modern": (
-        "Möbliere diesen leeren bzw. spärlich eingerichteten Innenraum mit modernem, "
-        "minimalistischem, hochwertigem Interieur (klare Linien, dezente Farben, "
-        "zeitgemäße Möbel und Dekoration). Fotorealistisch. Architektur, Fenster, Türen, "
-        "Boden und Raumproportionen unverändert lassen – nur Möbel und Dekoration ergänzen."
+        _STAGE_KEEP
+        + "Einrichtungsstil: modern, minimalistisch, hochwertig – klare Linien, dezente Farben, zeitgemäße Möbel."
     ),
     "classic": (
-        "Möbliere diesen leeren bzw. spärlich eingerichteten Innenraum mit klassischem, "
-        "elegantem, zeitlosem Interieur (edle Materialien, warme Töne, stilvolle Möbel und "
-        "Dekoration). Fotorealistisch. Architektur, Fenster, Türen, Boden und Raumproportionen "
-        "unverändert lassen – nur Möbel und Dekoration ergänzen."
+        _STAGE_KEEP
+        + "Einrichtungsstil: klassisch, elegant, zeitlos – edle Materialien, warme Töne, stilvolle Möbel."
     ),
 }
 
@@ -109,8 +115,10 @@ def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
     from PIL import Image, ImageOps
     im = Image.open(io.BytesIO(raw))
     im = ImageOps.exif_transpose(im).convert("RGB")
-    im.thumbnail((1024, 1024))  # kleiner Eingang = schneller (gegen Gateway-Timeout 504)
-    size = "1024x1024"          # schnellste/günstigste Ausgabestufe
+    im.thumbnail((1536, 1536))  # Auflösung begrenzen – Seitenverhältnis bleibt erhalten
+    w, h = im.size
+    # Ausgabeformat an das Seitenverhältnis anpassen (keine Verzerrung der Perspektive)
+    size = "1536x1024" if w > h else ("1024x1536" if h > w else "1024x1024")
     buf = io.BytesIO()
     im.save(buf, "PNG")
     buf.seek(0)
@@ -119,9 +127,11 @@ def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
             "https://api.openai.com/v1/images/edits",
             headers={"Authorization": f"Bearer {api_key}"},
             data={"model": IMG_AI_MODEL, "prompt": _STAGE_PROMPTS[mode],
-                  "size": size, "quality": IMG_AI_QUALITY, "n": "1"},
+                  "size": size, "quality": IMG_AI_QUALITY,
+                  "input_fidelity": "high",  # Originalraum/Perspektive treu erhalten
+                  "n": "1"},
             files={"image": ("room.png", buf, "image/png")},
-            timeout=110,
+            timeout=170,
         )
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"KI-Dienst nicht erreichbar: {e}")
@@ -154,6 +164,63 @@ async def enhance(
     else:
         raise HTTPException(status_code=400, detail=f"Unbekannter Modus: {mode}")
     return JSONResponse({"image_base64": base64.b64encode(out).decode(), "mime": mime})
+
+
+# --- Asynchrone KI-Möblierung (verhindert Gateway-Timeout 504) --------------
+_JOBS = {}          # job_id -> dict(status, image_base64, mime, error, ts)
+_JOBS_TTL = 900     # abgeschlossene Jobs nach 15 Min. vergessen
+
+
+def _cleanup_jobs():
+    now = time.time()
+    for k in [k for k, v in list(_JOBS.items()) if now - v.get("ts", now) > _JOBS_TTL]:
+        _JOBS.pop(k, None)
+
+
+def _run_stage_job(job_id: str, raw: bytes, mode: str, key: str):
+    try:
+        out = _ai_stage(raw, mode, key)
+        _JOBS[job_id] = {"status": "done", "image_base64": base64.b64encode(out).decode(),
+                         "mime": "image/png", "ts": time.time()}
+    except HTTPException as e:
+        _JOBS[job_id] = {"status": "error", "error": str(e.detail), "ts": time.time()}
+    except Exception as e:  # noqa: BLE001
+        _JOBS[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+@app.post("/enhance_start")
+async def enhance_start(
+    image: UploadFile = File(...),
+    mode: str = Form("modern"),
+    x_api_key: Optional[str] = Header(None),
+    x_img_ai_key: Optional[str] = Header(None),
+):
+    """Startet die KI-Möblierung im Hintergrund und liefert sofort eine job_id."""
+    _check_key(x_api_key)
+    if mode not in ("modern", "classic"):
+        raise HTTPException(status_code=400, detail="Nur 'modern' oder 'classic'.")
+    raw = await image.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Kein Bild empfangen.")
+    _cleanup_jobs()
+    job_id = uuid.uuid4().hex
+    _JOBS[job_id] = {"status": "pending", "ts": time.time()}
+    threading.Thread(target=_run_stage_job, args=(job_id, raw, mode, x_img_ai_key or ""), daemon=True).start()
+    return JSONResponse({"job_id": job_id})
+
+
+@app.get("/enhance_status")
+def enhance_status(job_id: str, x_api_key: Optional[str] = Header(None)):
+    """Fragt das Ergebnis eines KI-Möblierungs-Jobs ab."""
+    _check_key(x_api_key)
+    j = _JOBS.get(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="Job unbekannt oder abgelaufen.")
+    if j["status"] == "done":
+        return JSONResponse({"status": "done", "image_base64": j["image_base64"], "mime": j["mime"]})
+    if j["status"] == "error":
+        return JSONResponse({"status": "error", "detail": j.get("error", "Fehler")})
+    return JSONResponse({"status": "pending"})
 
 
 def _ai_rewrite(text: str, key: str = ""):
