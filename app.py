@@ -80,19 +80,20 @@ def health():
 
 
 def _basic_enhance(raw: bytes) -> bytes:
-    """Kostenlose, dezente Bildverbesserung – farbtreu, ohne Farbstich.
-    Nur sanfter, tonwert-erhaltender Autokontrast + minimale Farbe/Schärfe."""
-    from PIL import Image, ImageOps, ImageEnhance
+    """Kostenlose, dezente Bildverbesserung – hellt dunkle Bilder gezielt auf
+    (dunkelt NIE ab), plus milder Kontrast/Farbe/Schärfe. Farbtreu."""
+    from PIL import Image, ImageEnhance, ImageOps, ImageStat
     im = Image.open(io.BytesIO(raw))
     im = ImageOps.exif_transpose(im).convert("RGB")
-    # farbtreuer Autokontrast (verhindert Farbstich); Fallback für ältere Pillow-Versionen
-    try:
-        im = ImageOps.autocontrast(im, cutoff=0.5, preserve_tone=True)
-    except TypeError:
-        im = ImageOps.autocontrast(im, cutoff=0.5)
-    im = ImageEnhance.Color(im).enhance(1.04)
-    im = ImageEnhance.Contrast(im).enhance(1.03)
-    im = ImageEnhance.Sharpness(im).enhance(1.10)
+    # Zielhelligkeit: nur aufhellen, wenn das Bild zu dunkel ist.
+    mean = ImageStat.Stat(im.convert("L")).mean[0] or 1.0
+    target = 132.0
+    if mean < target:
+        factor = min(1.7, target / mean)
+        im = ImageEnhance.Brightness(im).enhance(factor)
+    im = ImageEnhance.Contrast(im).enhance(1.05)
+    im = ImageEnhance.Color(im).enhance(1.06)
+    im = ImageEnhance.Sharpness(im).enhance(1.12)
     out = io.BytesIO()
     im.save(out, "JPEG", quality=92)
     return out.getvalue()
@@ -108,8 +109,8 @@ def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
     from PIL import Image, ImageOps
     im = Image.open(io.BytesIO(raw))
     im = ImageOps.exif_transpose(im).convert("RGB")
-    w, h = im.size
-    size = "1536x1024" if w > h else ("1024x1536" if h > w else "1024x1024")
+    im.thumbnail((1024, 1024))  # kleiner Eingang = schneller (gegen Gateway-Timeout 504)
+    size = "1024x1024"          # schnellste/günstigste Ausgabestufe
     buf = io.BytesIO()
     im.save(buf, "PNG")
     buf.seek(0)
@@ -120,7 +121,7 @@ def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
             data={"model": IMG_AI_MODEL, "prompt": _STAGE_PROMPTS[mode],
                   "size": size, "quality": IMG_AI_QUALITY, "n": "1"},
             files={"image": ("room.png", buf, "image/png")},
-            timeout=180,
+            timeout=110,
         )
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"KI-Dienst nicht erreichbar: {e}")
