@@ -129,9 +129,13 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .photo-row{ width:100%; height:88mm; margin-bottom:6mm; }
 .photo-row:last-child{ margin-bottom:0; }
 .photo-row.pair{ display:flex; }
-.photo-row.pair .cell{ flex:1 1 0; height:100%; }
+.photo-row .cell{ height:100%; width:100%; position:relative; overflow:hidden; }
+.photo-row.pair .cell{ flex:1 1 0; }
 .photo-row.pair .cell:first-child{ margin-right:6mm; }
 .photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
+.photo-row.has-cap .cell img{ height:calc(100% - 6mm); }
+.photo-cap{ height:6mm; line-height:6mm; font-size:9pt; font-weight:300; color:#555;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Höhe je Format: quadratisch (Standard), hochformat, querformat + Einzelbilder */
 .photo-row.row-square{ height:88mm; }
 .photo-row.row-portrait{ height:117mm; }
@@ -199,12 +203,14 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   <div class="photos">
     {% for row in seite %}
       {% if row.cells|length == 2 %}
-      <div class="photo-row pair row-{{ row.type }}">
-        <div class="cell"><img src="{{ row.cells[0] }}"></div>
-        <div class="cell"><img src="{{ row.cells[1] }}"></div>
+      <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
+        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
       </div>
       {% else %}
-      <div class="photo-row row-{{ row.type }}"><img src="{{ row.cells[0] }}"></div>
+      <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
+        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+      </div>
       {% endif %}
     {% endfor %}
   </div>

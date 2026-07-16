@@ -105,12 +105,16 @@ def _basic_enhance(raw: bytes) -> bytes:
     return out.getvalue()
 
 
-def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
+def _ai_stage(raw: bytes, mode: str, key: str = "", caption: str = "") -> bytes:
     """KI-Möblierung via OpenAI-kompatiblem Images-Edit-Endpoint."""
     api_key = (key or IMG_AI_KEY or "").strip()
     if IMG_AI_PROVIDER == "none" or not api_key:
         raise HTTPException(status_code=400,
                             detail="KI-Möblierung ist nicht konfiguriert (kein KI-Schlüssel hinterlegt).")
+    prompt = _STAGE_PROMPTS[mode]
+    caption = (caption or "").strip()
+    if caption:
+        prompt += f" Es handelt sich um folgenden Raum/Bereich: {caption}. Möbliere passend zu dieser Nutzung."
     import requests
     from PIL import Image, ImageOps
     im = Image.open(io.BytesIO(raw))
@@ -126,7 +130,7 @@ def _ai_stage(raw: bytes, mode: str, key: str = "") -> bytes:
         resp = requests.post(
             "https://api.openai.com/v1/images/edits",
             headers={"Authorization": f"Bearer {api_key}"},
-            data={"model": IMG_AI_MODEL, "prompt": _STAGE_PROMPTS[mode],
+            data={"model": IMG_AI_MODEL, "prompt": prompt,
                   "size": size, "quality": IMG_AI_QUALITY,
                   "input_fidelity": "high",  # Originalraum/Perspektive treu erhalten
                   "n": "1"},
@@ -177,9 +181,9 @@ def _cleanup_jobs():
         _JOBS.pop(k, None)
 
 
-def _run_stage_job(job_id: str, raw: bytes, mode: str, key: str):
+def _run_stage_job(job_id: str, raw: bytes, mode: str, key: str, caption: str = ""):
     try:
-        out = _ai_stage(raw, mode, key)
+        out = _ai_stage(raw, mode, key, caption)
         _JOBS[job_id] = {"status": "done", "image_base64": base64.b64encode(out).decode(),
                          "mime": "image/png", "ts": time.time()}
     except HTTPException as e:
@@ -192,6 +196,7 @@ def _run_stage_job(job_id: str, raw: bytes, mode: str, key: str):
 async def enhance_start(
     image: UploadFile = File(...),
     mode: str = Form("modern"),
+    caption: str = Form(""),
     x_api_key: Optional[str] = Header(None),
     x_img_ai_key: Optional[str] = Header(None),
 ):
@@ -205,7 +210,7 @@ async def enhance_start(
     _cleanup_jobs()
     job_id = uuid.uuid4().hex
     _JOBS[job_id] = {"status": "pending", "ts": time.time()}
-    threading.Thread(target=_run_stage_job, args=(job_id, raw, mode, x_img_ai_key or ""), daemon=True).start()
+    threading.Thread(target=_run_stage_job, args=(job_id, raw, mode, x_img_ai_key or "", caption or ""), daemon=True).start()
     return JSONResponse({"job_id": job_id})
 
 

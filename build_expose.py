@@ -112,23 +112,26 @@ def group_photos(photos):
     rows = []
     buf = []
 
+    def _cell(p, c):
+        return {"src": p, "caption": c}
+
     def flush():
         while buf:
             pair = buf[:2]
             del buf[:2]
             if len(pair) == 2:
-                fmt = "portrait" if any(f == "portrait" for _, f in pair) else "square"
-                rows.append({"type": fmt, "cells": [p for p, _ in pair]})
+                fmt = "portrait" if any(f == "portrait" for _, f, _ in pair) else "square"
+                rows.append({"type": fmt, "cells": [_cell(p, c) for p, _, c in pair]})
             else:
-                p, f = pair[0]
-                rows.append({"type": "portrait_single" if f == "portrait" else "square_single", "cells": [p]})
+                p, f, c = pair[0]
+                rows.append({"type": "portrait_single" if f == "portrait" else "square_single", "cells": [_cell(p, c)]})
 
-    for p, f in photos:
+    for p, f, c in photos:
         if f == "landscape":
             flush()
-            rows.append({"type": "landscape", "cells": [p]})
+            rows.append({"type": "landscape", "cells": [_cell(p, c)]})
         else:
-            buf.append((p, f))
+            buf.append((p, f, c))
             if len(buf) == 2:
                 flush()
     flush()
@@ -198,6 +201,7 @@ def build(folder: Path):
     if disc_file:
         prep_image(disc_file, fdir / "bleed.jpg", max_px=2400); disclaimer_bild = "fotos/bleed.jpg"
     formats = data.get("foto_formats") or []
+    captions = data.get("foto_captions") or []
     valid_fmt = {"square", "portrait", "landscape"}
     photos = []
     for i, f in enumerate(gallery_src):
@@ -205,7 +209,8 @@ def build(folder: Path):
         fmt = formats[i] if i < len(formats) else "square"
         if fmt not in valid_fmt:
             fmt = "square"
-        photos.append((f"fotos/foto_{i:02d}.jpg", fmt))
+        cap = str(captions[i]).strip() if i < len(captions) and captions[i] else ""
+        photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap))
 
     grundriss = find_grundriss(folder, fdir)
 
@@ -229,6 +234,7 @@ def build(folder: Path):
         "eckdaten": data["eckdaten"],
         "beschreibung": [emphasis(p) for p in data["beschreibung"]],
         "fotoseiten": group_photos(photos),
+        "zeige_beschriftung": bool(data.get("bild_beschriftung")),
         "grundriss": grundriss,
         "disclaimer_bild": disclaimer_bild,
         "rechtstext": None,          # unten gesetzt
