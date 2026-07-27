@@ -64,10 +64,23 @@ def slug(s):
 
 
 def emphasis(text):
-    """HTML-escapen, dann **Begriff** -> <strong>Begriff</strong> (= Regular-Weight)."""
+    """HTML-escapen, dann **Begriff** -> <strong>Begriff</strong> (= Regular-Weight),
+    Zeilenumbrüche (\n) -> <br>."""
     from html import escape
-    out = escape(text)
-    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out)
+    out = escape(str(text))
+    out = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out)
+    return out.replace("\n", "<br>")
+
+
+def desc_block(b):
+    """Beschreibungs-Block aufbereiten: 'p' -> {type,html}; 'ul'/'ol' -> {type,items}.
+    Abwärtskompatibel: einfache Strings werden als Absatz behandelt."""
+    if isinstance(b, dict):
+        t = b.get("type", "p")
+        if t in ("ul", "ol"):
+            return {"type": t, "items": [emphasis(it) for it in (b.get("items") or [])]}
+        return {"type": "p", "html": emphasis(b.get("text", ""))}
+    return {"type": "p", "html": emphasis(b)}
 
 
 def prep_image(src: Path, dst: Path, max_px=2000):
@@ -232,7 +245,7 @@ def build(folder: Path):
         "objektnummer": data["objektnummer"],
         "titelbild": titel_src,
         "eckdaten": data["eckdaten"],
-        "beschreibung": [emphasis(p) for p in data["beschreibung"]],
+        "beschreibung": [desc_block(b) for b in data["beschreibung"]],
         "fotoseiten": group_photos(photos),
         "zeige_beschriftung": bool(data.get("bild_beschriftung")),
         "grundriss": grundriss,
