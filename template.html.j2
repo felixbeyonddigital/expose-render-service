@@ -178,11 +178,12 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   {% if druck %}<div class="footer">{{ footer }}</div>{% endif %}
 </div>
 
-<!-- ===== Seite 2: Eckdaten ===== -->
+<!-- ===== Seite 2: Eckdaten (bricht bei Bedarf auf Folgeseiten um) ===== -->
+{% for seite in eckdaten_seiten %}
 <div class="page">
   <div class="data-wrap">
     <div class="eck">
-      {% for row in eckdaten %}
+      {% for row in seite %}
         {% if row.spacer %}<div class="eck-row"><div class="eck-label">&nbsp;</div><div class="eck-value"></div></div>
         {% else %}<div class="eck-row"><div class="eck-label">{{ row.label }}</div><div class="eck-value">{{ row.value }}</div></div>{% endif %}
       {% endfor %}
@@ -192,6 +193,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
+{% endfor %}
 
 <!-- ===== Seite 3: Beschreibung ===== -->
 <div class="page">

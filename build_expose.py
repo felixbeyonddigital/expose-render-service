@@ -164,12 +164,61 @@ def paginate_rows(rows, budget=250):
     return pages
 
 
+# --- Safezone: Fußzeile/Logo liegen unten (footer-logo top ≈ 266mm). Inhalt endet darüber. ---
+CONTENT_SAFE_BOTTOM_MM = 262.0   # kein Inhalt (Bilder/Text) unterhalb – schützt Logo/Fußzeile
+
 # --- Abschätzung der Beschreibungshöhe (für „Fotos direkt nach kurzem Text") ---
-DESC_WIDTH_CH       = 92      # ca. Zeichen pro Zeile (11pt über ~166mm)
-DESC_LINE_MM        = 6.0     # Zeilenhöhe (line-height 1.55 * 11pt)
-DESC_PARA_GAP_MM    = 3.2     # Absatzabstand (margin-bottom 9pt)
-DESC_LIST_ITEM_MM   = 0.8     # Extra-Abstand je Listenpunkt
-DESC_PAGE_USABLE_MM = 245.0   # A4-Nutzhöhe Beschreibungsseite (297 - 30 oben - ~22 Fußzeile)
+DESC_WIDTH_CH     = 92      # ca. Zeichen pro Zeile (11pt über ~166mm)
+DESC_LINE_MM      = 6.0     # Zeilenhöhe (line-height 1.55 * 11pt)
+DESC_PARA_GAP_MM  = 3.2     # Absatzabstand (margin-bottom 9pt)
+DESC_LIST_ITEM_MM = 0.8     # Extra-Abstand je Listenpunkt
+DESC_TOP_MM       = 30.0    # .desc padding-top
+DESC_USABLE_MM    = CONTENT_SAFE_BOTTOM_MM - DESC_TOP_MM   # Nutzhöhe Beschreibungsseite (~232mm)
+
+# --- Eckdaten-Tabelle (Seite 2): Umbruch auf Folgeseite, ohne die Objektnummer zu überdecken ---
+ECK_LINE_MM        = 5.3     # Zeilenhöhe (line-height 1.35 * 11pt)
+ECK_ROW_PAD_MM     = 3.9     # Zellen-Padding oben+unten (7px+7px) + Linie
+ECK_VALUE_CH       = 58      # Zeichen pro Zeile in der Wertspalte (~110mm, 11pt)
+ECK_LABEL_CH       = 28      # Zeichen pro Zeile in der Label-Spalte (~60mm)
+ECK_SPACER_MM      = 5.3     # Höhe einer Trennlinien-/Leerzeile
+ECK_TOP_MM         = 42.0    # .data-wrap padding-top
+ECK_SAFE_BOTTOM_MM = 224.0   # muss klar über der Objektnummer (bottom:52mm ≈ 240mm oben) enden
+ECK_AVAIL_MM       = ECK_SAFE_BOTTOM_MM - ECK_TOP_MM       # ~182mm nutzbar je Eckdaten-Seite
+
+
+def _eck_row_mm(row):
+    """Grobe Höhe einer Eckdaten-Zeile in mm (mehrzeilige Werte/Labels berücksichtigt)."""
+    if isinstance(row, dict) and row.get("spacer"):
+        return ECK_SPACER_MM
+    label = str((row or {}).get("label", ""))
+    value = str((row or {}).get("value", ""))
+    vlines = 0
+    for seg in value.split("\n"):
+        vlines += max(1, math.ceil(len(seg) / ECK_VALUE_CH)) if seg else 1
+    llines = max(1, math.ceil(len(label) / ECK_LABEL_CH)) if label else 1
+    lines = max(1, vlines, llines)
+    return ECK_ROW_PAD_MM + lines * ECK_LINE_MM
+
+
+def paginate_eck(rows):
+    """Eckdaten-Zeilen auf Seiten verteilen; führende/abschließende Trennlinien je Seite entfernen."""
+    pages, cur, used = [], [], 0.0
+    for r in rows:
+        h = _eck_row_mm(r)
+        if cur and used + h > ECK_AVAIL_MM:
+            pages.append(cur); cur = []; used = 0.0
+        cur.append(r); used += h
+    if cur:
+        pages.append(cur)
+    # Trennlinien am Seitenanfang/-ende säubern
+    cleaned = []
+    for pg in pages:
+        while pg and isinstance(pg[0], dict) and pg[0].get("spacer"):
+            pg = pg[1:]
+        while pg and isinstance(pg[-1], dict) and pg[-1].get("spacer"):
+            pg = pg[:-1]
+        cleaned.append(pg)
+    return cleaned or [[]]
 
 
 def _plain_len(s):
@@ -197,9 +246,9 @@ def split_desc_photos(rows, desc_mm, enabled):
     Nur wenn aktiviert UND Text unter ~60% der Seite. Gibt (desc_rows, rest_rows) zurück."""
     if not enabled or not rows:
         return [], rows
-    if desc_mm > 0.60 * DESC_PAGE_USABLE_MM:
+    if desc_mm > 0.60 * DESC_USABLE_MM:
         return [], rows
-    avail = DESC_PAGE_USABLE_MM - desc_mm - 10.0   # 10mm Abstand Text -> Fotos
+    avail = DESC_USABLE_MM - desc_mm - 10.0   # 10mm Abstand Text -> Fotos, endet in der Safezone
     desc_rows, used, i = [], 0.0, 0
     while i < len(rows):
         h = ROW_HEIGHT_MM.get(rows[i]["type"], 88) + 6
@@ -299,7 +348,7 @@ def build(folder: Path):
         "titel_zeile2": data["titel_zeile2"],
         "objektnummer": data["objektnummer"],
         "titelbild": titel_src,
-        "eckdaten": data["eckdaten"],
+        "eckdaten_seiten": paginate_eck(data.get("eckdaten") or []),
         "beschreibung": [desc_block(b) for b in data["beschreibung"]],
         "zeige_beschriftung": bool(data.get("bild_beschriftung")),
         "desc_fotos": desc_fotos,
