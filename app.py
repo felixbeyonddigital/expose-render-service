@@ -295,6 +295,67 @@ async def rewrite(
     return JSONResponse({"variants": _ai_rewrite(t, x_img_ai_key or "")})
 
 
+def _ai_spellcheck(text: str, key: str = ""):
+    """Nur Rechtschreibung/Grammatik/Zeichensetzung korrigieren – Wortlaut, Stil und Struktur bleiben."""
+    api_key = (key or IMG_AI_KEY or "").strip()
+    if IMG_AI_PROVIDER == "none" or not api_key:
+        raise HTTPException(status_code=400, detail="KI-Rechtschreibprüfung ist nicht konfiguriert (kein KI-Schlüssel).")
+    import requests
+    import json as _json
+    sys_prompt = (
+        "Du bist ein deutschsprachiger Korrektor. Korrigiere im folgenden Text AUSSCHLIESSLICH Rechtschreibung, "
+        "Grammatik, Zeichensetzung und offensichtliche Tippfehler.\n"
+        "STRIKTE REGELN: Wortlaut, Stil, Formulierung, Inhalt, Fakten, Zahlen, Maße und Absatzstruktur bleiben "
+        "UNVERÄNDERT. Nicht umformulieren, keine Synonyme, nichts hinzufügen oder weglassen. Absätze (Leerzeilen) "
+        "exakt beibehalten. Österreichische Schreibweise beibehalten. Sind keine Fehler vorhanden, gib den Text "
+        "unverändert zurück.\n"
+        "Antworte NUR als JSON: {\"text\": \"…\", \"changed\": true/false}"
+    )
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": IMG_AI_TEXT_MODEL,
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": text},
+                ],
+            },
+            timeout=90,
+        )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"KI-Dienst nicht erreichbar: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"KI-Fehler ({r.status_code}): {r.text[:300]}")
+    try:
+        content = r.json()["choices"][0]["message"]["content"]
+        data = _json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=502, detail="KI-Antwort konnte nicht gelesen werden.")
+    corrected = str(data.get("text") or "").strip()
+    if not corrected:
+        raise HTTPException(status_code=502, detail="Keine korrigierte Fassung erhalten.")
+    changed = bool(data.get("changed")) or (corrected != text.strip())
+    return {"text": corrected, "changed": changed}
+
+
+@app.post("/spellcheck")
+async def spellcheck(
+    text: str = Form(...),
+    x_api_key: Optional[str] = Header(None),
+    x_img_ai_key: Optional[str] = Header(None),
+):
+    """Rechtschreibung/Grammatik korrigieren – nur Fehler, kein Umformulieren."""
+    _check_key(x_api_key)
+    t = (text or "").strip()
+    if not t:
+        raise HTTPException(status_code=400, detail="Kein Text übergeben.")
+    return JSONResponse(_ai_spellcheck(t, x_img_ai_key or ""))
+
+
 @app.post("/generate")
 async def generate(
     daten: str = Form(..., description="Objektdaten als JSON-String (Schema wie daten.json)"),

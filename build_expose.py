@@ -16,7 +16,7 @@ Ergebnis wird in denselben Ordner geschrieben:
     <Objektnummer>_<Titel>_DRUCK.pdf
     <Objektnummer>_<Titel>_MAIL.pdf
 """
-import json, sys, os, shutil, subprocess, tempfile, re
+import json, sys, os, shutil, subprocess, tempfile, re, math
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image, ImageOps
@@ -115,12 +115,12 @@ ROW_HEIGHT_MM = {
 }
 
 
-def group_photos(photos):
-    """Fotos nach Format gruppieren.
-    photos: Liste (pfad, format) mit format in {square, portrait, landscape}.
+def photo_rows(photos):
+    """Fotos nach Format in Reihen gruppieren (flach, ohne Seitenumbruch).
+    photos: Liste (pfad, format, caption) mit format in {square, portrait, landscape}.
     - quadratisch/hochformat: 2 pro Reihe (paarweise)
     - querformat: 1 pro Reihe (volle Breite)
-    Rückgabe: Seiten (Liste) aus Reihen-Dicts {type, cells:[pfad,...]}.
+    Rückgabe: Liste von Reihen-Dicts {type, cells:[{src,caption},...]}.
     """
     rows = []
     buf = []
@@ -148,9 +148,12 @@ def group_photos(photos):
             if len(buf) == 2:
                 flush()
     flush()
+    return rows
 
-    # Seiten nach Höhenbudget füllen (statt fix 2 Reihen), damit hohe Formate nicht überlaufen.
-    pages, cur, used, budget = [], [], 0, 250
+
+def paginate_rows(rows, budget=250):
+    """Reihen nach Höhenbudget auf Seiten verteilen (hohe Formate laufen nicht über)."""
+    pages, cur, used = [], [], 0
     for r in rows:
         h = ROW_HEIGHT_MM.get(r["type"], 88) + 6
         if cur and used + h > budget:
@@ -159,6 +162,51 @@ def group_photos(photos):
     if cur:
         pages.append(cur)
     return pages
+
+
+# --- Abschätzung der Beschreibungshöhe (für „Fotos direkt nach kurzem Text") ---
+DESC_WIDTH_CH       = 92      # ca. Zeichen pro Zeile (11pt über ~166mm)
+DESC_LINE_MM        = 6.0     # Zeilenhöhe (line-height 1.55 * 11pt)
+DESC_PARA_GAP_MM    = 3.2     # Absatzabstand (margin-bottom 9pt)
+DESC_LIST_ITEM_MM   = 0.8     # Extra-Abstand je Listenpunkt
+DESC_PAGE_USABLE_MM = 245.0   # A4-Nutzhöhe Beschreibungsseite (297 - 30 oben - ~22 Fußzeile)
+
+
+def _plain_len(s):
+    return len(re.sub(r"<[^>]+>", "", str(s or "")))
+
+
+def estimate_desc_mm(blocks):
+    """Grobe Höhenabschätzung des Beschreibungstexts in mm."""
+    h = 0.0
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") in ("ul", "ol"):
+            for it in (b.get("items") or []):
+                lines = max(1, math.ceil(_plain_len(it) / DESC_WIDTH_CH))
+                h += lines * DESC_LINE_MM + DESC_LIST_ITEM_MM
+            h += DESC_PARA_GAP_MM
+            continue
+        txt = b.get("text", "") if isinstance(b, dict) else b
+        lines = max(1, math.ceil(_plain_len(txt) / DESC_WIDTH_CH))
+        h += lines * DESC_LINE_MM + DESC_PARA_GAP_MM
+    return h
+
+
+def split_desc_photos(rows, desc_mm, enabled):
+    """Entscheiden, welche Fotoreihen direkt unter die Beschreibung passen.
+    Nur wenn aktiviert UND Text unter ~60% der Seite. Gibt (desc_rows, rest_rows) zurück."""
+    if not enabled or not rows:
+        return [], rows
+    if desc_mm > 0.60 * DESC_PAGE_USABLE_MM:
+        return [], rows
+    avail = DESC_PAGE_USABLE_MM - desc_mm - 10.0   # 10mm Abstand Text -> Fotos
+    desc_rows, used, i = [], 0.0, 0
+    while i < len(rows):
+        h = ROW_HEIGHT_MM.get(rows[i]["type"], 88) + 6
+        if used + h > avail:
+            break
+        desc_rows.append(rows[i]); used += h; i += 1
+    return desc_rows, rows[i:]
 
 
 def find_grundriss(folder: Path, work: Path):
@@ -234,6 +282,13 @@ def build(folder: Path):
     logo_white = logo_svg.replace("currentColor", "#ffffff")
     logo_dark = logo_svg.replace("currentColor", _theme_color)
 
+    # Fotoreihen aufbauen; bei kurzem Beschreibungstext die ersten Reihen direkt
+    # unter die Beschreibung setzen (Option „fotos_nach_text", Standard: an).
+    all_rows = photo_rows(photos)
+    desc_mm = estimate_desc_mm(data.get("beschreibung") or [])
+    inline_enabled = bool(data.get("fotos_nach_text", True))
+    desc_fotos, rest_rows = split_desc_photos(all_rows, desc_mm, inline_enabled)
+
     ctx = {
         "footer": FOOTER,
         "gewerbe": bool(data.get("gewerbe")),
@@ -246,8 +301,9 @@ def build(folder: Path):
         "titelbild": titel_src,
         "eckdaten": data["eckdaten"],
         "beschreibung": [desc_block(b) for b in data["beschreibung"]],
-        "fotoseiten": group_photos(photos),
         "zeige_beschriftung": bool(data.get("bild_beschriftung")),
+        "desc_fotos": desc_fotos,
+        "fotoseiten": paginate_rows(rest_rows),
         "grundriss": grundriss,
         "disclaimer_bild": disclaimer_bild,
         "rechtstext": None,          # unten gesetzt

@@ -129,6 +129,8 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 
 /* ---------- Fotoseiten ---------- */
 .photos{ padding:14mm 14mm 0 14mm; }
+/* Fotos direkt unter der Beschreibung (bei kurzem Text) */
+.desc-photos{ padding:10mm 14mm 0 14mm; }
 .photo-row{ width:100%; height:88mm; margin-bottom:6mm; }
 .photo-row:last-child{ margin-bottom:0; }
 .photo-row.pair{ display:flex; }
@@ -154,7 +156,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 /* ---------- Seite 8: Disclaimer ---------- */
 .bleed{ position:relative; width:100%; height:118mm; }
 .bleed img{ width:100%; height:100%; object-fit:cover; display:block; }
-.bleed .stripe{ position:absolute; left:0; right:0; bottom:0; height:6mm; background:var(--green); }
+.bleed .stripe{ position:absolute; left:0; right:0; bottom:0; height:2mm; background:var(--green); }
 .legal{ padding:16mm 22mm 0 22mm; }
 .legal h3{ font-size:11pt; font-weight:700; margin-bottom:10pt; }
 .legal p{ font-size:11pt; font-weight:300; line-height:1.5; text-align:justify; margin-bottom:9pt; white-space:pre-line; }
@@ -196,6 +198,22 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   <div class="desc">
     {% for b in beschreibung %}{% if b.type == 'ul' %}<ul class="desc-list">{% for it in b['items'] %}<li>{{ it|safe }}</li>{% endfor %}</ul>{% elif b.type == 'ol' %}<ol class="desc-list">{% for it in b['items'] %}<li>{{ it|safe }}</li>{% endfor %}</ol>{% else %}<p>{{ b.html|safe }}</p>{% endif %}{% endfor %}
   </div>
+  {% if desc_fotos %}
+  <div class="desc-photos">
+    {% for row in desc_fotos %}
+      {% if row.cells|length == 2 %}
+      <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
+        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
+      </div>
+      {% else %}
+      <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
+        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
   <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
