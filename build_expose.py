@@ -264,12 +264,15 @@ def find_grundriss(folder: Path, work: Path):
             if name.suffix.lower() == ".pdf":
                 import fitz
                 doc = fitz.open(name)
-                imgs = doc[0].get_images(full=True)
-                if imgs:
-                    d = doc.extract_image(imgs[0][0])
-                    p = work / ("grundriss." + d["ext"])
-                    p.write_bytes(d["image"])
-                    return f"fotos/{p.name}"
+                # Erste Seite als Bild RENDERN (funktioniert für Vektor- UND Raster-PDFs;
+                # get_images() lieferte bei reinen Vektor-Grundrissen nichts → Grundriss fehlte).
+                pix = doc[0].get_pixmap(dpi=200)
+                src = work / "grundriss_src.png"
+                pix.save(src)
+                doc.close()
+                dst = work / "grundriss.jpg"
+                prep_image(src, dst, max_px=2400)
+                return f"fotos/{dst.name}"
             else:
                 dst = work / ("grundriss" + name.suffix.lower())
                 prep_image(name, dst, max_px=2400)
