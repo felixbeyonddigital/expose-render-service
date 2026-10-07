@@ -1,3 +1,17 @@
+{% macro render_rows(rows, caps) -%}
+  {% for row in rows %}
+    {% if row.cells|length == 2 %}
+    <div class="photo-row pair row-{{ row.type }}{% if caps %} has-cap{% endif %}">
+      <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if caps and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+      <div class="cell{% if row.cells[1].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[1].src }}">{% if caps and row.cells[1].caption %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
+    </div>
+    {% else %}
+    <div class="photo-row row-{{ row.type }}{% if caps %} has-cap{% endif %}">
+      <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if caps and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+    </div>
+    {% endif %}
+  {% endfor %}
+{%- endmacro %}
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -151,9 +165,14 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .photo-row.row-square_single{ height:120mm; }
 .photo-row.row-portrait_single{ height:150mm; }
 
-/* ---------- Grundriss ---------- */
+/* ---------- Abschnitts-Überschrift (über Fotoblöcken) ---------- */
+.section-heading{ font-size:14pt; font-weight:400; color:var(--green); letter-spacing:.2px; margin:0 0 6mm 0; }
+
+/* ---------- Grundriss / Ansicht / Schnitt (je 1 pro Seite, groß) ---------- */
 .plan-wrap{ padding:26mm 18mm 0 18mm; text-align:center; }
 .plan-wrap img{ max-width:100%; max-height:190mm; object-fit:contain; }
+.plan-heading{ padding:18mm 18mm 0 18mm; font-size:14pt; font-weight:400; color:var(--green); letter-spacing:.2px; }
+.plan-wrap.has-heading{ padding-top:6mm; }
 .plan-caption{ position:absolute; right:20mm; bottom:70mm; font-size:15pt; font-weight:300; color:#555; }
 
 /* ---------- Seite 8: Disclaimer ---------- */
@@ -205,55 +224,35 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   </div>
   {% if desc_fotos %}
   <div class="desc-photos">
-    {% for row in desc_fotos %}
-      {% if row.cells|length == 2 %}
-      <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-        <div class="cell{% if row.cells[1].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung and row.cells[1].caption %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
-      </div>
-      {% else %}
-      <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-      </div>
-      {% endif %}
-    {% endfor %}
+    {{ render_rows(desc_fotos, zeige_beschriftung) }}
   </div>
   {% endif %}
   <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>
 
-<!-- ===== Fotoseiten ===== -->
-{% for seite in fotoseiten %}
-<div class="page">
-  <div class="photos">
-    {% for row in seite %}
-      {% if row.cells|length == 2 %}
-      <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-        <div class="cell{% if row.cells[1].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung and row.cells[1].caption %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
+<!-- ===== Inhaltsblöcke: Fotos / Grundrisse / Ansichten (in Reihenfolge) ===== -->
+{% for block in blocks %}
+  {% if block.kind == 'photos' %}
+    {% for page in block.pages %}
+    <div class="page">
+      <div class="photos">
+        {% if block.heading and loop.first %}<div class="section-heading">{{ block.heading }}</div>{% endif %}
+        {{ render_rows(page, zeige_beschriftung) }}
       </div>
-      {% else %}
-      <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-      </div>
-      {% endif %}
+      <div class="footer-logo">{{ logo_dark|safe }}</div>
+      <div class="footer">{{ footer }}</div>
+    </div>
     {% endfor %}
-  </div>
-  <div class="footer-logo">{{ logo_dark|safe }}</div>
-  <div class="footer">{{ footer }}</div>
-</div>
+  {% elif block.kind == 'plan' %}
+    <div class="page">
+      {% if block.heading %}<div class="plan-heading">{{ block.heading }}</div>{% endif %}
+      <div class="plan-wrap{% if block.heading %} has-heading{% endif %}"><img src="{{ block.src }}"></div>
+      <div class="footer-logo">{{ logo_dark|safe }}</div>
+      <div class="footer">{{ footer }}</div>
+    </div>
+  {% endif %}
 {% endfor %}
-
-<!-- ===== Grundriss ===== -->
-{% if grundriss %}
-<div class="page">
-  <div class="plan-wrap"><img src="{{ grundriss }}"></div>
-  {% if grundriss_label %}<div class="plan-caption">{{ grundriss_label }}</div>{% endif %}
-  <div class="footer-logo">{{ logo_dark|safe }}</div>
-  <div class="footer">{{ footer }}</div>
-</div>
-{% endif %}
 
 <!-- ===== Seite 8: Disclaimer ===== -->
 <div class="page">

@@ -170,17 +170,86 @@ def photo_rows(photos):
     return rows
 
 
-def paginate_rows(rows, budget=250):
-    """Reihen nach Höhenbudget auf Seiten verteilen (hohe Formate laufen nicht über)."""
+def paginate_rows(rows, budget=250, first_reserve=0):
+    """Reihen nach Höhenbudget auf Seiten verteilen (hohe Formate laufen nicht über).
+    first_reserve: mm, die auf der ERSTEN Seite für eine Abschnitts-Überschrift reserviert werden."""
     pages, cur, used = [], [], 0
     for r in rows:
+        cap = budget - (first_reserve if len(pages) == 0 else 0)
         h = ROW_HEIGHT_MM.get(r["type"], 88) + 6
-        if cur and used + h > budget:
+        if cur and used + h > cap:
             pages.append(cur); cur = []; used = 0
         cur.append(r); used += h
     if cur:
         pages.append(cur)
     return pages
+
+
+def build_blocks(data, gallery_src, folder, fdir):
+    """Baut die geordnete Inhalts-Block-Liste nach der Beschreibung.
+    Neu (content-Modell): data['content'] = geordnete Liste aus
+      {type:'section', heading} | {type:'photo', idx, fmt, caption, nocrop}
+      | {type:'grundriss'|'ansicht', idx, heading, nocrop}
+    mit Bilddateien im Ordner 'content/' (Reihenfolge = idx).
+    Alt (Legacy): gallery_src + foto_* Arrays → ein Fotoblock + Grundriss-Block.
+    Jeder Block: {kind:'photos', heading, rows:[...]} ODER {kind:'plan', heading, src, nocrop}.
+    """
+    valid_fmt = {"square", "portrait", "landscape"}
+    blocks = []
+    content = data.get("content")
+
+    if content:
+        media_dir = folder / "content"
+        media_files = sorted([f for f in media_dir.iterdir() if f.is_file()]) if media_dir.is_dir() else []
+        cur_heading = ""
+        cur_photos = []
+        pc = [0]
+
+        def flush():
+            if cur_photos:
+                blocks.append({"kind": "photos", "heading": cur_heading, "rows": photo_rows(list(cur_photos))})
+            cur_photos.clear()
+
+        for e in content:
+            t = (e or {}).get("type", "photo")
+            if t == "section":
+                flush(); cur_heading = str(e.get("heading") or "").strip()
+            elif t in ("grundriss", "ansicht"):
+                flush(); cur_heading = ""
+                idx = int(e.get("idx", -1))
+                if 0 <= idx < len(media_files):
+                    dst = fdir / f"plan_{len(blocks):02d}.jpg"
+                    prep_any(media_files[idx], dst, max_px=2400)
+                    blocks.append({"kind": "plan", "heading": str(e.get("heading") or "").strip(),
+                                   "src": f"fotos/{dst.name}", "nocrop": bool(e.get("nocrop"))})
+            else:  # photo
+                idx = int(e.get("idx", -1))
+                if 0 <= idx < len(media_files):
+                    dst = fdir / f"cfoto_{pc[0]:02d}.jpg"; pc[0] += 1
+                    prep_any(media_files[idx], dst)
+                    fmt = e.get("fmt", "square"); fmt = fmt if fmt in valid_fmt else "square"
+                    cur_photos.append((f"fotos/{dst.name}", fmt, str(e.get("caption") or "").strip(), bool(e.get("nocrop"))))
+        flush()
+    else:
+        formats = data.get("foto_formats") or []
+        captions = data.get("foto_captions") or []
+        nocrops = data.get("foto_nocrop") or []
+        photos = []
+        for i, f in enumerate(gallery_src):
+            prep_any(f, fdir / f"foto_{i:02d}.jpg")
+            fmt = formats[i] if i < len(formats) else "square"
+            if fmt not in valid_fmt:
+                fmt = "square"
+            cap = str(captions[i]).strip() if i < len(captions) and captions[i] else ""
+            nc = bool(nocrops[i]) if i < len(nocrops) else False
+            photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap, nc))
+        if photos:
+            blocks.append({"kind": "photos", "heading": "", "rows": photo_rows(photos)})
+        gr = find_grundriss(folder, fdir)
+        if gr:
+            blocks.append({"kind": "plan", "heading": str(data.get("grundriss_label", "Grundriss") or "").strip(),
+                           "src": gr, "nocrop": False})
+    return blocks
 
 
 # --- Safezone: Fußzeile/Logo liegen unten (footer-logo top ≈ 266mm). Inhalt endet darüber. ---
@@ -332,22 +401,6 @@ def build(folder: Path):
     disclaimer_bild = None
     if disc_file:
         prep_any(disc_file, fdir / "bleed.jpg", max_px=2400); disclaimer_bild = "fotos/bleed.jpg"
-    formats = data.get("foto_formats") or []
-    captions = data.get("foto_captions") or []
-    nocrops = data.get("foto_nocrop") or []
-    valid_fmt = {"square", "portrait", "landscape"}
-    photos = []
-    for i, f in enumerate(gallery_src):
-        prep_any(f, fdir / f"foto_{i:02d}.jpg")
-        fmt = formats[i] if i < len(formats) else "square"
-        if fmt not in valid_fmt:
-            fmt = "square"
-        cap = str(captions[i]).strip() if i < len(captions) and captions[i] else ""
-        nc = bool(nocrops[i]) if i < len(nocrops) else False
-        photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap, nc))
-
-    grundriss = find_grundriss(folder, fdir)
-
     # Logo: eigenes Logo aus den Daten (vom Plugin, currentColor-normalisiert) oder Standard-Logo.
     # Farbe direkt ins SVG einbacken (robust, unabhängig von currentColor-Unterstützung).
     logo_svg = data.get("logo_svg") or (GEN_DIR / "assets" / "logos" / "logo.svg").read_text(encoding="utf-8")
@@ -355,12 +408,21 @@ def build(folder: Path):
     logo_white = logo_svg.replace("currentColor", "#ffffff")
     logo_dark = logo_svg.replace("currentColor", _theme_color)
 
-    # Fotoreihen aufbauen; bei kurzem Beschreibungstext die ersten Reihen direkt
-    # unter die Beschreibung setzen (Option „fotos_nach_text", Standard: an).
-    all_rows = photo_rows(photos)
-    desc_mm = estimate_desc_mm(data.get("beschreibung") or [])
-    inline_enabled = bool(data.get("fotos_nach_text", True))
-    desc_fotos, rest_rows = split_desc_photos(all_rows, desc_mm, inline_enabled)
+    # Inhaltsblöcke (Fotos/Grundrisse/Ansichten in Reihenfolge) aufbauen.
+    blocks = build_blocks(data, gallery_src, folder, fdir)
+    # „Fotos direkt nach kurzem Text": nur aus dem ERSTEN Fotoblock OHNE Überschrift.
+    desc_fotos = []
+    if blocks and blocks[0]["kind"] == "photos" and not blocks[0]["heading"]:
+        desc_mm = estimate_desc_mm(data.get("beschreibung") or [])
+        inline_enabled = bool(data.get("fotos_nach_text", True))
+        desc_fotos, rest = split_desc_photos(blocks[0]["rows"], desc_mm, inline_enabled)
+        blocks[0]["rows"] = rest
+        if not rest:
+            blocks.pop(0)
+    # Fotoblöcke paginieren (Überschrift reserviert Platz auf der 1. Seite).
+    for b in blocks:
+        if b["kind"] == "photos":
+            b["pages"] = paginate_rows(b["rows"], first_reserve=(12 if b["heading"] else 0))
 
     ctx = {
         "footer": FOOTER,
@@ -376,9 +438,7 @@ def build(folder: Path):
         "beschreibung": [desc_block(b) for b in data["beschreibung"]],
         "zeige_beschriftung": bool(data.get("bild_beschriftung")),
         "desc_fotos": desc_fotos,
-        "fotoseiten": paginate_rows(rest_rows),
-        "grundriss": grundriss,
-        "grundriss_label": data.get("grundriss_label", "Grundriss"),
+        "blocks": blocks,
         "disclaimer_bild": disclaimer_bild,
         "rechtstext": None,          # unten gesetzt
         "rechtstext_heading": None,  # unten gesetzt

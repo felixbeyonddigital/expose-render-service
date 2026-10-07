@@ -363,6 +363,7 @@ async def generate(
     grundriss: Optional[UploadFile] = File(None),
     disclaimer_bild: Optional[UploadFile] = File(None),
     fotos: List[UploadFile] = File(default=[]),
+    media: List[UploadFile] = File(default=[]),
     x_api_key: Optional[str] = Header(None),
 ):
     _check_key(x_api_key)
@@ -376,8 +377,8 @@ async def generate(
         if field not in data:
             raise HTTPException(status_code=400, detail=f"Pflichtfeld fehlt in daten: '{field}'")
 
-    if len(fotos) > MAX_FOTOS:
-        raise HTTPException(status_code=400, detail=f"Zu viele Fotos (max {MAX_FOTOS}).")
+    if len(fotos) > MAX_FOTOS or len(media) > MAX_FOTOS + 20:
+        raise HTTPException(status_code=400, detail=f"Zu viele Bilder (max {MAX_FOTOS}).")
 
     work = Path(tempfile.mkdtemp(prefix="expose_"))
     try:
@@ -400,10 +401,18 @@ async def generate(
             ext = Path(grundriss.filename or "grundriss.jpg").suffix.lower() or ".jpg"
             _save(grundriss, work / f"Grundriss{ext}")
 
-        # Galeriefotos (Reihenfolge = Upload-Reihenfolge)
+        # Galeriefotos (Legacy-Modell; Reihenfolge = Upload-Reihenfolge)
         for i, up in enumerate(fotos):
             name = Path(up.filename or f"foto_{i}.jpg").name
             _save(up, work / "Fotos" / f"{i:02d}_{name}")
+
+        # Geordnete Inhalts-Medien (neues content-Modell): Fotos/Grundrisse/Ansichten in Reihenfolge.
+        # Reihenfolge der Dateien = idx in data['content'].
+        if media:
+            (work / "content").mkdir(exist_ok=True)
+            for i, up in enumerate(media):
+                name = Path(up.filename or f"m_{i}.jpg").name
+                _save(up, work / "content" / f"{i:03d}_{name}")
 
         # daten.json schreiben und Engine aufrufen
         (work / "daten.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
