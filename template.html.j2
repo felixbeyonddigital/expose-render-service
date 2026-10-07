@@ -138,6 +138,9 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .photo-row.pair .cell{ flex:1 1 0; }
 .photo-row.pair .cell:first-child{ margin-right:6mm; }
 .photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
+/* „Nicht beschneiden": Bild vollständig einpassen (Letterbox auf neutralem Grund) */
+.photo-row .cell.nocrop{ background:#f4f3f0; }
+.photo-row .cell.nocrop img{ object-fit:contain; }
 .photo-row.has-cap .cell img{ height:calc(100% - 6mm); }
 .photo-cap{ height:6mm; line-height:6mm; font-size:9pt; font-weight:300; color:#555;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -205,12 +208,12 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     {% for row in desc_fotos %}
       {% if row.cells|length == 2 %}
       <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-        <div class="cell"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[1].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung and row.cells[1].caption %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
       </div>
       {% else %}
       <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
       </div>
       {% endif %}
     {% endfor %}
@@ -227,12 +230,12 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
     {% for row in seite %}
       {% if row.cells|length == 2 %}
       <div class="photo-row pair row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
-        <div class="cell"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[1].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[1].src }}">{% if zeige_beschriftung and row.cells[1].caption %}<div class="photo-cap">{{ row.cells[1].caption }}</div>{% endif %}</div>
       </div>
       {% else %}
       <div class="photo-row row-{{ row.type }}{% if zeige_beschriftung %} has-cap{% endif %}">
-        <div class="cell"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
+        <div class="cell{% if row.cells[0].nocrop %} nocrop{% endif %}"><img src="{{ row.cells[0].src }}">{% if zeige_beschriftung and row.cells[0].caption %}<div class="photo-cap">{{ row.cells[0].caption }}</div>{% endif %}</div>
       </div>
       {% endif %}
     {% endfor %}
@@ -246,7 +249,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 {% if grundriss %}
 <div class="page">
   <div class="plan-wrap"><img src="{{ grundriss }}"></div>
-  <div class="plan-caption">Grundriss</div>
+  {% if grundriss_label %}<div class="plan-caption">{{ grundriss_label }}</div>{% endif %}
   <div class="footer-logo">{{ logo_dark|safe }}</div>
   <div class="footer">{{ footer }}</div>
 </div>

@@ -94,6 +94,25 @@ def prep_image(src: Path, dst: Path, max_px=2000):
     im.save(dst, "JPEG", quality=90)
 
 
+def prep_any(src: Path, dst: Path, max_px=2000):
+    """Wie prep_image, aber akzeptiert auch PDFs (z. B. Pläne): erste Seite wird
+    gerendert (Vektor + Raster) und dann wie ein Bild aufbereitet."""
+    if src.suffix.lower() == ".pdf":
+        import fitz
+        doc = fitz.open(src)
+        pix = doc[0].get_pixmap(dpi=200)
+        tmp = dst.parent / (dst.stem + "_src.png")
+        pix.save(tmp)
+        doc.close()
+        prep_image(tmp, dst, max_px=max_px)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+    else:
+        prep_image(src, dst, max_px=max_px)
+
+
 def source_photos(folder: Path):
     """Liste der Foto-Quelldateien aus Fotos/ (sortiert, 'bearbeitet' bevorzugt)."""
     fdir = folder / "Fotos"
@@ -102,7 +121,7 @@ def source_photos(folder: Path):
         fdir = cand[0] if cand else None
     if not fdir:
         return []
-    exts = {".jpg", ".jpeg", ".png"}
+    exts = {".jpg", ".jpeg", ".png", ".pdf"}
     files = sorted([f for f in fdir.iterdir() if f.suffix.lower() in exts])
     # Wenn eine "_bearbeitet"-Version existiert, das unbearbeitete Original weglassen
     edited_stems = {f.stem.replace("_bearbeitet", "") for f in files if "_bearbeitet" in f.stem}
@@ -117,34 +136,34 @@ ROW_HEIGHT_MM = {
 
 def photo_rows(photos):
     """Fotos nach Format in Reihen gruppieren (flach, ohne Seitenumbruch).
-    photos: Liste (pfad, format, caption) mit format in {square, portrait, landscape}.
+    photos: Liste (pfad, format, caption, nocrop) mit format in {square, portrait, landscape}.
     - quadratisch/hochformat: 2 pro Reihe (paarweise)
     - querformat: 1 pro Reihe (volle Breite)
-    Rückgabe: Liste von Reihen-Dicts {type, cells:[{src,caption},...]}.
+    Rückgabe: Liste von Reihen-Dicts {type, cells:[{src,caption,nocrop},...]}.
     """
     rows = []
     buf = []
 
-    def _cell(p, c):
-        return {"src": p, "caption": c}
+    def _cell(p, c, nc):
+        return {"src": p, "caption": c, "nocrop": bool(nc)}
 
     def flush():
         while buf:
             pair = buf[:2]
             del buf[:2]
             if len(pair) == 2:
-                fmt = "portrait" if any(f == "portrait" for _, f, _ in pair) else "square"
-                rows.append({"type": fmt, "cells": [_cell(p, c) for p, _, c in pair]})
+                fmt = "portrait" if any(f == "portrait" for _, f, _, _ in pair) else "square"
+                rows.append({"type": fmt, "cells": [_cell(p, c, nc) for p, _, c, nc in pair]})
             else:
-                p, f, c = pair[0]
-                rows.append({"type": "portrait_single" if f == "portrait" else "square_single", "cells": [_cell(p, c)]})
+                p, f, c, nc = pair[0]
+                rows.append({"type": "portrait_single" if f == "portrait" else "square_single", "cells": [_cell(p, c, nc)]})
 
-    for p, f, c in photos:
+    for p, f, c, nc in photos:
         if f == "landscape":
             flush()
-            rows.append({"type": "landscape", "cells": [_cell(p, c)]})
+            rows.append({"type": "landscape", "cells": [_cell(p, c, nc)]})
         else:
-            buf.append((p, f, c))
+            buf.append((p, f, c, nc))
             if len(buf) == 2:
                 flush()
     flush()
@@ -306,24 +325,26 @@ def build(folder: Path):
     else:
         disc_file = titel_file  # sichere, attraktive Vorgabe
 
-    # --- Bilder aufbereiten ---
+    # --- Bilder aufbereiten (prep_any akzeptiert auch PDF-Pläne) ---
     titel_src = None
     if titel_file:
-        prep_image(titel_file, fdir / "titel.jpg", max_px=2400); titel_src = "fotos/titel.jpg"
+        prep_any(titel_file, fdir / "titel.jpg", max_px=2400); titel_src = "fotos/titel.jpg"
     disclaimer_bild = None
     if disc_file:
-        prep_image(disc_file, fdir / "bleed.jpg", max_px=2400); disclaimer_bild = "fotos/bleed.jpg"
+        prep_any(disc_file, fdir / "bleed.jpg", max_px=2400); disclaimer_bild = "fotos/bleed.jpg"
     formats = data.get("foto_formats") or []
     captions = data.get("foto_captions") or []
+    nocrops = data.get("foto_nocrop") or []
     valid_fmt = {"square", "portrait", "landscape"}
     photos = []
     for i, f in enumerate(gallery_src):
-        prep_image(f, fdir / f"foto_{i:02d}.jpg")
+        prep_any(f, fdir / f"foto_{i:02d}.jpg")
         fmt = formats[i] if i < len(formats) else "square"
         if fmt not in valid_fmt:
             fmt = "square"
         cap = str(captions[i]).strip() if i < len(captions) and captions[i] else ""
-        photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap))
+        nc = bool(nocrops[i]) if i < len(nocrops) else False
+        photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap, nc))
 
     grundriss = find_grundriss(folder, fdir)
 
@@ -357,6 +378,7 @@ def build(folder: Path):
         "desc_fotos": desc_fotos,
         "fotoseiten": paginate_rows(rest_rows),
         "grundriss": grundriss,
+        "grundriss_label": data.get("grundriss_label", "Grundriss"),
         "disclaimer_bild": disclaimer_bild,
         "rechtstext": None,          # unten gesetzt
         "rechtstext_heading": None,  # unten gesetzt
