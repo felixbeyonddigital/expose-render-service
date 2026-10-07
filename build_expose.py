@@ -185,6 +185,21 @@ def paginate_rows(rows, budget=250, first_reserve=0):
     return pages
 
 
+def _auto_fmt(path):
+    """Format aus dem tatsächlichen Seitenverhältnis bestimmen (für „Original/nicht beschneiden")."""
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+            a = (w / h) if h else 1.0
+    except Exception:
+        a = 1.0
+    if a > 1.25:
+        return "landscape"
+    if a < 0.80:
+        return "portrait"
+    return "square"
+
+
 def build_blocks(data, gallery_src, folder, fdir):
     """Baut die geordnete Inhalts-Block-Liste nach der Beschreibung.
     Neu (content-Modell): data['content'] = geordnete Liste aus
@@ -227,8 +242,14 @@ def build_blocks(data, gallery_src, folder, fdir):
                 if 0 <= idx < len(media_files):
                     dst = fdir / f"cfoto_{pc[0]:02d}.jpg"; pc[0] += 1
                     prep_any(media_files[idx], dst)
-                    fmt = e.get("fmt", "square"); fmt = fmt if fmt in valid_fmt else "square"
-                    cur_photos.append((f"fotos/{dst.name}", fmt, str(e.get("caption") or "").strip(), bool(e.get("nocrop"))))
+                    fmt = e.get("fmt", "original")
+                    if fmt == "original":
+                        fmt2, nc = _auto_fmt(dst), True          # Originalformat: nicht beschneiden
+                    elif fmt in valid_fmt:
+                        fmt2, nc = fmt, False                    # fester Zuschnitt
+                    else:
+                        fmt2, nc = "square", bool(e.get("nocrop"))
+                    cur_photos.append((f"fotos/{dst.name}", fmt2, str(e.get("caption") or "").strip(), nc))
         flush()
     else:
         formats = data.get("foto_formats") or []
@@ -237,12 +258,15 @@ def build_blocks(data, gallery_src, folder, fdir):
         photos = []
         for i, f in enumerate(gallery_src):
             prep_any(f, fdir / f"foto_{i:02d}.jpg")
-            fmt = formats[i] if i < len(formats) else "square"
-            if fmt not in valid_fmt:
-                fmt = "square"
+            fmt = formats[i] if i < len(formats) else "original"
             cap = str(captions[i]).strip() if i < len(captions) and captions[i] else ""
-            nc = bool(nocrops[i]) if i < len(nocrops) else False
-            photos.append((f"fotos/foto_{i:02d}.jpg", fmt, cap, nc))
+            if fmt == "original":
+                fmt2, nc = _auto_fmt(fdir / f"foto_{i:02d}.jpg"), True
+            elif fmt in valid_fmt:
+                fmt2, nc = fmt, (bool(nocrops[i]) if i < len(nocrops) else False)
+            else:
+                fmt2, nc = "square", (bool(nocrops[i]) if i < len(nocrops) else False)
+            photos.append((f"fotos/foto_{i:02d}.jpg", fmt2, cap, nc))
         if photos:
             blocks.append({"kind": "photos", "heading": "", "rows": photo_rows(photos)})
         gr = find_grundriss(folder, fdir)
