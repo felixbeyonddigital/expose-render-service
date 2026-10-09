@@ -489,10 +489,14 @@ def build(folder: Path):
     mail_full = work / "mail_full.pdf"
     HTML(str(work / "mail.html"), base_url=str(work)).write_pdf(str(mail_full))
     mail = folder / f"{out_base}_MAIL.pdf"
+    # Bilder scharf halten (200 dpi, Bicubic) – früher 120 dpi, dadurch wirkten Fotos unscharf.
     subprocess.run([
         "gs", "-sDEVICE=pdfwrite", "-dCompatibilityLevel=1.5",
-        "-dPDFSETTINGS=/ebook", "-dNOPAUSE", "-dQUIET", "-dBATCH",
-        "-dColorImageResolution=120", "-dGrayImageResolution=120",
+        "-dPDFSETTINGS=/printer", "-dNOPAUSE", "-dQUIET", "-dBATCH",
+        "-dDownsampleColorImages=true", "-dDownsampleGrayImages=true",
+        "-dColorImageDownsampleType=/Bicubic", "-dGrayImageDownsampleType=/Bicubic",
+        "-dColorImageResolution=200", "-dGrayImageResolution=200",
+        "-dColorImageDownsampleThreshold=1.0", "-dGrayImageDownsampleThreshold=1.0",
         f"-sOutputFile={mail}", str(mail_full)
     ], check=True)
 
