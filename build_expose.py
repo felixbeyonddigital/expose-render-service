@@ -458,6 +458,8 @@ def build(folder: Path):
         "titel_zeile2": data["titel_zeile2"],
         "objektnummer": data["objektnummer"],
         "titelbild": titel_src,
+        # Titelbild im Originalformat zeigen (nicht beschneiden) -> ganzes Bild inkl. Logo-Ecke sichtbar.
+        "titel_nocrop": (str(data.get("titel_fmt", "original")) == "original"),
         "eckdaten_seiten": paginate_eck(data.get("eckdaten") or []),
         "beschreibung": [desc_block(b) for b in data["beschreibung"]],
         "zeige_beschriftung": bool(data.get("bild_beschriftung")),

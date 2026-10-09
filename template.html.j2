@@ -101,6 +101,9 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
   height:100mm; border:5px solid #ffffff;
 }
 .cover .hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+/* Titelbild im Originalformat: ganzes Bild zeigen (nicht beschneiden), weißer Rahmen statt Beschnitt – so wird die eingebrannte Logo-Ecke nicht abgeschnitten. */
+.cover .hero.hero-orig{ background:#ffffff; }
+.cover .hero.hero-orig img{ object-fit:contain; }
 .cover .cover-logo{
   position:absolute; left:0; right:0; top:243mm; text-align:center;
   color:#ffffff;                                   /* MAIL: weißes Logo auf farbigem Deckblatt */
@@ -153,7 +156,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 .photo-row.pair .cell:first-child{ margin-right:6mm; }
 .photo-row img{ width:100%; height:100%; object-fit:cover; display:block; }
 /* „Nicht beschneiden": Bild vollständig einpassen (Letterbox auf neutralem Grund) */
-.photo-row .cell.nocrop{ background:#f4f3f0; }
+.photo-row .cell.nocrop{ background:#ffffff; }   /* kein grauer Hintergrund hinter Original-Fotos */
 .photo-row .cell.nocrop img{ object-fit:contain; }
 .photo-row.has-cap .cell img{ height:calc(100% - 6mm); }
 .photo-cap{ height:6mm; line-height:6mm; font-size:9pt; font-weight:300; color:#555;
@@ -188,7 +191,7 @@ html,body{ font-family:'Montserrat',sans-serif; color:var(--text); -weasy-hyphen
 
 <!-- ===== Seite 1: Deckblatt ===== -->
 <div class="page cover{% if druck %} cover-druck{% endif %}">
-  <div class="hero"><img src="{{ titelbild }}"></div>
+  <div class="hero{% if titel_nocrop %} hero-orig{% endif %}"><img src="{{ titelbild }}"></div>
   {% if druck %}<div class="druck-stripe"></div>{% endif %}
   <div class="titleblock">
     <div class="accent"></div>
